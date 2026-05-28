@@ -61,12 +61,21 @@ export default function LoginPage() {
       router.push("/");
     } catch (err) {
       if (axios.isAxiosError(err)) {
-        const msg = err.response?.data?.message;
-        setSubmitError(
-          Array.isArray(msg) ? msg.join(", ") : (msg ?? "Đăng nhập thất bại"),
-        );
+        if (!err.response) {
+          setSubmitError(
+            "Không kết nối được tới backend (lỗi mạng hoặc CORS). " +
+              "Kiểm tra NEXT_PUBLIC_API_URL và CORS_ORIGINS của backend.",
+          );
+        } else {
+          const msg = err.response.data?.message;
+          setSubmitError(
+            Array.isArray(msg)
+              ? msg.join(", ")
+              : (msg ?? `Lỗi ${err.response.status}: Đăng nhập thất bại`),
+          );
+        }
       } else {
-        setSubmitError("Không kết nối được tới máy chủ");
+        setSubmitError("Lỗi không xác định");
       }
     }
   };

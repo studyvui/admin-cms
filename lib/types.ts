@@ -24,12 +24,7 @@ export interface LoginResponse extends AuthTokens {
   user: User;
 }
 
-export type QuestionStatus =
-  | "draft"
-  | "review"
-  | "approved"
-  | "published"
-  | "deprecated";
+export type Subject = "english" | "math";
 
 export type LessonStatus =
   | "draft"
@@ -38,7 +33,12 @@ export type LessonStatus =
   | "published"
   | "archived";
 
-export type Subject = "english" | "math";
+export type QuestionStatus =
+  | "draft"
+  | "review"
+  | "approved"
+  | "published"
+  | "deprecated";
 
 export interface Course {
   id: string;
@@ -47,8 +47,23 @@ export interface Course {
   grade: number;
   name: string;
   description?: string | null;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateCourseInput {
+  code: string;
+  subject: Subject;
+  grade: number;
+  name: string;
+  description?: string;
+}
+
+export interface UpdateCourseInput {
+  name?: string;
+  description?: string;
+  isActive?: boolean;
 }
 
 export interface Lesson {
@@ -57,14 +72,31 @@ export interface Lesson {
   code: string;
   week: number;
   orderIndex: number;
-  title: string;
-  description?: string | null;
-  lessonType?: string | null;
+  name: string;
+  lessonType: string;
+  skills: string[];
   status: LessonStatus;
   isPremium: boolean;
-  prerequisites: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateLessonInput {
+  courseId: string;
+  code: string;
+  week: number;
+  orderIndex: number;
+  name: string;
+  lessonType: string;
+  skills: string[];
+}
+
+export interface UpdateLessonInput {
+  name?: string;
+  lessonType?: string;
+  skills?: string[];
+  week?: number;
+  orderIndex?: number;
 }
 
 export interface Question {
@@ -72,17 +104,35 @@ export interface Question {
   lessonId: string;
   code: string;
   type: string;
-  skill?: string | null;
+  skill: string;
   difficulty: number;
-  text?: string | null;
-  options?: unknown;
-  correctAnswer?: unknown;
-  imagePath?: string | null;
-  audioPath?: string | null;
+  content: Record<string, unknown>;
+  correctAnswer: string;
+  assetRefs: string[];
   status: QuestionStatus;
   authorId?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateQuestionInput {
+  lessonId: string;
+  code: string;
+  type: string;
+  skill: string;
+  difficulty: number;
+  content: Record<string, unknown>;
+  correctAnswer: string;
+  assetRefs?: string[];
+}
+
+export interface UpdateQuestionInput {
+  type?: string;
+  skill?: string;
+  difficulty?: number;
+  content?: Record<string, unknown>;
+  correctAnswer?: string;
+  assetRefs?: string[];
 }
 
 export interface ApiErrorPayload {
