@@ -195,3 +195,14 @@ export interface ReviewQueue {
   lessonsForReview: ReviewLessonItem[];
   questionsForReview: ReviewQuestionItem[];
 }
+
+export interface DashboardOverview {
+  users: { total: number; activeLast7Days: number };
+  content: {
+    courses: number;
+    lessons: { total: number; byStatus: Record<string, number> };
+    questions: { total: number; byStatus: Record<string, number> };
+  };
+  activity: { answersToday: number };
+  business: { activeSubscriptions: number };
+}
