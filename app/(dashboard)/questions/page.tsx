@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, ArrowRight, ImageIcon, Music, X } from "lucide-react";
+import { Plus, Pencil, ArrowRight, ImageIcon, Music, X, Trash2 } from "lucide-react";
 import { lessonsApi } from "@/lib/api/lessons";
 import { ImagePicker } from "@/components/asset-picker/image-picker";
 import { AudioPicker } from "@/components/asset-picker/audio-picker";
@@ -165,6 +165,12 @@ export default function QuestionsPage() {
       queryClient.invalidateQueries({ queryKey: ["questions"] }),
   });
 
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => questionsApi.delete(id),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["questions"] }),
+  });
+
   const lessonNameById = useMemo(() => {
     const m = new Map<string, string>();
     lessons?.forEach((l) => m.set(l.id, `${l.code} — ${l.name}`));
@@ -182,6 +188,7 @@ export default function QuestionsPage() {
 
   const canWrite = hasRole("admin", "editor");
   const canChangeStatus = hasRole("admin", "qa");
+  const canDelete = hasRole("admin");
 
   const onSubmit = (values: QuestionFormValues) => {
     const assetRefs = (values.assetRefsCsv ?? "")
@@ -418,6 +425,26 @@ export default function QuestionsPage() {
                               }}
                             >
                               <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={deleteMut.isPending}
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Xoá câu hỏi "${q.code}"? Thao tác này không thể hoàn tác.`,
+                                  )
+                                ) {
+                                  deleteMut.mutate(q.id);
+                                }
+                              }}
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              title="Xoá câu hỏi"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
