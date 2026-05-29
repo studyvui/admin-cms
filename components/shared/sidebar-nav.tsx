@@ -40,7 +40,7 @@ const NAV: NavItem[] = [
 ];
 
 export function SidebarNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const { hasRole, hydrated } = useAuth();
 
   return (
