@@ -139,7 +139,7 @@ export default function LessonsPage() {
     );
   }
 
-  const canWrite = hasRole("admin", "editor");
+  const canWrite = hasRole("admin");
   const canChangeStatus = hasRole("admin", "qa");
 
   const onSubmit = (values: LessonFormValues) => {
