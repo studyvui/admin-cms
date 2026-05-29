@@ -46,16 +46,19 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function DashboardHome() {
-  const { user, hydrated } = useAuth();
+  const { user, hydrated, hasRole } = useAuth();
+  const canSeeAdminData = hasRole("admin", "qa");
 
   const overviewQuery = useQuery({
     queryKey: ["dashboard", "overview"],
     queryFn: () => qaApi.getOverview(),
+    enabled: canSeeAdminData,
   });
 
   const queueQuery = useQuery({
     queryKey: ["dashboard", "review-queue-mini"],
     queryFn: () => qaApi.getReviewQueue(),
+    enabled: canSeeAdminData,
   });
 
   if (!hydrated) return null;
@@ -90,7 +93,24 @@ export default function DashboardHome() {
         </Button>
       </div>
 
-      {overviewQuery.error && (
+      {!canSeeAdminData && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="py-4 text-sm text-blue-900">
+            Chào mừng <strong>{user?.name}</strong>! Anh/chị vào{" "}
+            <Link href="/lessons" className="font-medium underline">
+              Bài học
+            </Link>{" "}
+            hoặc{" "}
+            <Link href="/questions" className="font-medium underline">
+              Câu hỏi
+            </Link>{" "}
+            để bắt đầu soạn nội dung. Sau khi tạo xong, bấm{" "}
+            <strong>Chuyển duyệt</strong> để admin xét duyệt.
+          </CardContent>
+        </Card>
+      )}
+
+      {canSeeAdminData && overviewQuery.error && (
         <Card className="border-destructive">
           <CardContent className="py-4 text-sm text-destructive">
             Lỗi tải overview: {extractError(overviewQuery.error)}
@@ -98,6 +118,8 @@ export default function DashboardHome() {
         </Card>
       )}
 
+      {canSeeAdminData && (
+      <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={Users}
@@ -186,6 +208,8 @@ export default function DashboardHome() {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }
