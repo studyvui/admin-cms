@@ -150,3 +150,48 @@ export interface ApiErrorPayload {
   message: string | string[];
   error?: string;
 }
+
+export type AuditAction =
+  | "create"
+  | "update"
+  | "delete"
+  | "publish"
+  | "archive"
+  | "bulk_import"
+  | "status_change"
+  | "rollback";
+
+export interface AuditUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
+export interface AuditLog {
+  id: string;
+  userId: string;
+  user?: AuditUser | null;
+  action: AuditAction;
+  entityType: string;
+  entityId: string;
+  entityCode?: string | null;
+  changes: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+}
+
+export interface ReviewLessonItem extends Lesson {
+  course?: { code: string; name: string };
+}
+
+export interface ReviewQuestionItem extends Question {
+  lesson?: { code: string; name: string };
+}
+
+export interface ReviewQueue {
+  lessonsForReview: ReviewLessonItem[];
+  questionsForReview: ReviewQuestionItem[];
+}
