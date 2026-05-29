@@ -187,8 +187,14 @@ export default function QuestionsPage() {
   }
 
   const canWrite = hasRole("admin", "editor");
-  const canChangeStatus = hasRole("admin", "qa");
+  const canChangeStatus = hasRole("admin", "qa", "editor");
   const canDelete = hasRole("admin");
+  const isEditor = hasRole("editor") && !hasRole("admin");
+
+  // Editor chi sua duoc cau hoi o status draft hoac review.
+  const canEditQuestion = (q: Question) =>
+    canWrite &&
+    (!isEditor || q.status === "draft" || q.status === "review");
 
   const onSubmit = (values: QuestionFormValues) => {
     const assetRefs = (values.assetRefsCsv ?? "")
@@ -373,7 +379,15 @@ export default function QuestionsPage() {
               </TableHeader>
               <TableBody>
                 {questions.map((q) => {
-                  const nextStatuses = STATUS_FLOW[q.status] ?? [];
+                  const allNextStatuses = STATUS_FLOW[q.status] ?? [];
+                  // Editor: chi cho phep draft→review va review→draft
+                  const nextStatuses = isEditor
+                    ? allNextStatuses.filter(
+                        (s) =>
+                          (q.status === "draft" && s === "review") ||
+                          (q.status === "review" && s === "draft"),
+                      )
+                    : allNextStatuses;
                   return (
                     <TableRow key={q.id}>
                       <TableCell className="font-mono text-xs">
@@ -415,7 +429,7 @@ export default function QuestionsPage() {
                                 {next}
                               </Button>
                             ))}
-                          {canWrite && (
+                          {canEditQuestion(q) && (
                             <Button
                               variant="ghost"
                               size="icon"
