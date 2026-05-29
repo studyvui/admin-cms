@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { SidebarNav } from "@/components/shared/sidebar-nav";
 import { Topbar } from "@/components/shared/topbar";
 
+export const runtime = "edge";
+
 export default function DashboardLayout({
   children,
 }: {
