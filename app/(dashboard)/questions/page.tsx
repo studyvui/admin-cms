@@ -5,8 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, ArrowRight } from "lucide-react";
+import { Plus, Pencil, ArrowRight, ImageIcon, Music, X } from "lucide-react";
 import { lessonsApi } from "@/lib/api/lessons";
+import { ImagePicker } from "@/components/asset-picker/image-picker";
+import { AudioPicker } from "@/components/asset-picker/audio-picker";
 import { questionsApi } from "@/lib/api/questions";
 import type {
   CreateQuestionInput,
@@ -735,16 +737,12 @@ function QuestionDialog({
             </>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="assetRefsCsv">
-              Asset refs (đường dẫn ảnh/audio, phân tách bằng dấu phẩy)
-            </Label>
-            <Input
-              id="assetRefsCsv"
-              placeholder="assets/images/grade1/english/apple_1.png"
-              {...register("assetRefsCsv")}
-            />
-          </div>
+          <AssetRefsField
+            value={watch("assetRefsCsv") ?? ""}
+            onChange={(v) =>
+              setValue("assetRefsCsv", v, { shouldValidate: true })
+            }
+          />
 
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -766,5 +764,108 @@ function QuestionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AssetRefsField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (csv: string) => void;
+}) {
+  const [imageOpen, setImageOpen] = useState(false);
+  const [audioOpen, setAudioOpen] = useState(false);
+
+  const refs = useMemo(
+    () =>
+      value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [value],
+  );
+
+  const setRefs = (next: string[]) => {
+    const unique = Array.from(new Set(next));
+    onChange(unique.join(", "));
+  };
+
+  const remove = (key: string) => {
+    setRefs(refs.filter((r) => r !== key));
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label>Asset đính kèm (ảnh / audio)</Label>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setImageOpen(true)}
+        >
+          <ImageIcon className="mr-1.5 h-4 w-4" />
+          Chọn ảnh
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAudioOpen(true)}
+        >
+          <Music className="mr-1.5 h-4 w-4" />
+          Chọn audio
+        </Button>
+      </div>
+
+      {refs.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 rounded-md border bg-muted/30 p-2">
+          {refs.map((k) => (
+            <Badge key={k} variant="secondary" className="gap-1 font-mono">
+              <span className="truncate max-w-[240px]">{k}</span>
+              <button
+                type="button"
+                onClick={() => remove(k)}
+                className="hover:text-destructive"
+                aria-label={`Bỏ ${k}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Chưa chọn asset nào — bấm nút phía trên để chọn từ kho R2.
+        </p>
+      )}
+
+      <ImagePicker
+        open={imageOpen}
+        onOpenChange={setImageOpen}
+        initialSelected={refs.filter((r) => /\.(png|webp|jpe?g|gif|svg)$/i.test(r))}
+        multiple
+        onConfirm={(picked) => {
+          const audioOnly = refs.filter(
+            (r) => !/\.(png|webp|jpe?g|gif|svg)$/i.test(r),
+          );
+          setRefs([...audioOnly, ...picked]);
+        }}
+      />
+
+      <AudioPicker
+        open={audioOpen}
+        onOpenChange={setAudioOpen}
+        initialSelected={refs.filter((r) => /\.(mp3|ogg|wav|m4a)$/i.test(r))}
+        multiple
+        onConfirm={(picked) => {
+          const imageOnly = refs.filter(
+            (r) => !/\.(mp3|ogg|wav|m4a)$/i.test(r),
+          );
+          setRefs([...imageOnly, ...picked]);
+        }}
+      />
+    </div>
   );
 }

@@ -135,6 +135,16 @@ export interface UpdateQuestionInput {
   assetRefs?: string[];
 }
 
+export type AssetType = "image" | "audio";
+
+export interface AssetItem {
+  key: string;
+  url: string;
+  size: number;
+  lastModified: string;
+  type: AssetType;
+}
+
 export interface ApiErrorPayload {
   statusCode: number;
   message: string | string[];
