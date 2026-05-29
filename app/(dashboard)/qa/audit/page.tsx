@@ -206,6 +206,16 @@ function AuditLogInner() {
 function AuditLogCard({ log }: { log: AuditLog }) {
   const [expanded, setExpanded] = useState(false);
   const changes = useMemo(() => parseChanges(log.changes), [log.changes]);
+  const meta = (log.metadata ?? {}) as Record<string, unknown>;
+  const metaKeys = Object.keys(meta);
+
+  // Inline summary cho status_change (metadata.from -> metadata.to)
+  const statusSummary =
+    log.action === "status_change" && meta.from !== undefined && meta.to !== undefined
+      ? { from: String(meta.from), to: String(meta.to) }
+      : null;
+
+  const hasDetail = changes.length > 0 || metaKeys.length > 0;
 
   return (
     <Card>
@@ -220,6 +230,17 @@ function AuditLogCard({ log }: { log: AuditLog }) {
               {log.entityCode && (
                 <span className="font-mono text-xs text-muted-foreground">
                   {log.entityCode}
+                </span>
+              )}
+              {statusSummary && (
+                <span className="ml-1 flex items-center gap-1 text-xs">
+                  <span className="rounded bg-red-50 px-1.5 py-0.5 font-mono text-red-900">
+                    {statusSummary.from}
+                  </span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="rounded bg-green-50 px-1.5 py-0.5 font-mono text-green-900">
+                    {statusSummary.to}
+                  </span>
                 </span>
               )}
             </div>
@@ -240,18 +261,20 @@ function AuditLogCard({ log }: { log: AuditLog }) {
               )}
             </div>
           </div>
-          {changes.length > 0 && (
+          {hasDetail && (
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setExpanded((x) => !x)}
             >
-              {expanded ? "Ẩn" : `Xem diff (${changes.length})`}
+              {expanded
+                ? "Ẩn"
+                : `Xem chi tiết${changes.length > 0 ? ` (${changes.length})` : ""}`}
             </Button>
           )}
         </div>
 
-        {expanded && changes.length > 0 && (
+        {expanded && hasDetail && (
           <div className="mt-3 space-y-2 border-t pt-3">
             {changes.map((c) => (
               <div
@@ -285,6 +308,14 @@ function AuditLogCard({ log }: { log: AuditLog }) {
                 )}
               </div>
             ))}
+            {metaKeys.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-2 text-xs">
+                <div className="mb-1 font-mono font-semibold">metadata</div>
+                <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-background p-1 font-mono text-[11px]">
+                  {formatVal(meta)}
+                </pre>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
