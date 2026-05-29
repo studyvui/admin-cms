@@ -196,6 +196,16 @@ export interface ReviewQueue {
   questionsForReview: ReviewQuestionItem[];
 }
 
+export interface DailyQuestionStat {
+  day: string;
+  created: number;
+  approved: number;
+  published: number;
+  review: number;
+  rejected: number;
+  draftNew: number;
+}
+
 export interface DashboardOverview {
   users: { total: number; activeLast7Days: number };
   content: {

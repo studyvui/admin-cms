@@ -13,6 +13,7 @@ import {
   Sparkles,
   Settings,
   FolderOpen,
+  BarChart3,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ const NAV: NavItem[] = [
   { href: "/courses", label: "Khoá học", icon: BookOpen, roles: ["admin"] },
   { href: "/lessons", label: "Bài học", icon: ListChecks, roles: ["admin", "editor", "qa"] },
   { href: "/questions", label: "Câu hỏi", icon: FileQuestion, roles: ["admin", "editor", "qa"] },
+  { href: "/my-stats", label: "Năng suất của tôi", icon: BarChart3, roles: ["admin", "editor", "qa"] },
   { href: "/assets", label: "Kho asset", icon: FolderOpen, roles: ["admin", "editor", "qa"] },
   { href: "/bulk-import", label: "Import Excel", icon: Upload, roles: ["admin", "editor"] },
   { href: "/qa/queue", label: "QA Queue", icon: ShieldCheck, roles: ["admin", "qa"] },

@@ -6,6 +6,7 @@ import {
 } from "@/lib/api-client";
 import type {
   CreateQuestionInput,
+  DailyQuestionStat,
   Question,
   QuestionStatus,
   UpdateQuestionInput,
@@ -37,4 +38,8 @@ export const questionsApi = {
     apiDelete<{ success: boolean }>(`/admin/questions/${id}`),
   bulkUpload: (questions: CreateQuestionInput[]) =>
     apiPost<BulkUploadResult>("/admin/questions/bulk-upload", { questions }),
+  myStats: (days = 30) =>
+    apiGet<DailyQuestionStat[]>("/admin/questions/my-stats", {
+      params: { days },
+    }),
 };
