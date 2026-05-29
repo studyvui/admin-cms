@@ -69,8 +69,8 @@ export default function AuditLogPage() {
 
 function AuditLogInner() {
   const searchParams = useSearchParams();
-  const focusedEntity = searchParams.get("entity") ?? "";
-  const focusedId = searchParams.get("id") ?? "";
+  const focusedEntity = searchParams?.get("entity") ?? "";
+  const focusedId = searchParams?.get("id") ?? "";
 
   const [action, setAction] = useState<typeof ALL | AuditAction>(ALL);
   const [entityType, setEntityType] = useState(focusedEntity || ALL);
