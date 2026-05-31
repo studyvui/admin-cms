@@ -9,6 +9,10 @@ import {
   Music,
   Search,
   Loader2,
+  Folder,
+  FolderOpen,
+  LayoutList,
+  ChevronRight,
 } from "lucide-react";
 import { assetsApi } from "@/lib/api/assets";
 import type { AssetItem, AssetType } from "@/lib/types";
@@ -54,6 +58,12 @@ interface PendingFile {
   result?: AssetItem;
 }
 
+function getFolderFromKey(key: string): string {
+  const lastSlash = key.lastIndexOf("/");
+  if (lastSlash === -1) return "(gốc)";
+  return key.slice(0, lastSlash + 1);
+}
+
 export default function AssetsPage() {
   const { hasRole, hydrated } = useAuth();
   const queryClient = useQueryClient();
@@ -62,6 +72,8 @@ export default function AssetsPage() {
   const [prefix, setPrefix] = useState("grade1/english/");
   const [pending, setPending] = useState<PendingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [viewMode, setViewMode] = useState<"flat" | "folder">("flat");
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading, error } = useQuery({
@@ -87,6 +99,29 @@ export default function AssetsPage() {
     return items;
   }, [data, typeFilter, search]);
 
+  // folder mode: map folder → assets (from filtered list)
+  const folderMap = useMemo(() => {
+    const map = new Map<string, AssetItem[]>();
+    for (const item of filtered) {
+      const folder = getFolderFromKey(item.key);
+      if (!map.has(folder)) map.set(folder, []);
+      map.get(folder)!.push(item);
+    }
+    const sorted = Array.from(map.entries()).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
+    return new Map<string, AssetItem[]>(sorted);
+  }, [filtered]);
+
+  // assets shown inside a selected folder
+  const folderItems = useMemo(
+    () =>
+      selectedFolder
+        ? filtered.filter((a) => getFolderFromKey(a.key) === selectedFolder)
+        : [],
+    [filtered, selectedFolder],
+  );
+
   const handleFiles = useCallback(
     (files: FileList | File[]) => {
       const arr = Array.from(files);
@@ -104,7 +139,6 @@ export default function AssetsPage() {
       }));
       setPending((prev) => [...prev, ...next]);
 
-      // Start uploading queued files sequentially
       next
         .filter((p) => p.status === "queued")
         .forEach((p) => {
@@ -118,9 +152,7 @@ export default function AssetsPage() {
             .then((result) => {
               setPending((prev) =>
                 prev.map((x) =>
-                  x.id === p.id
-                    ? { ...x, status: "done", result }
-                    : x,
+                  x.id === p.id ? { ...x, status: "done", result } : x,
                 ),
               );
               queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -161,6 +193,16 @@ export default function AssetsPage() {
 
   const canUpload = hasRole("admin", "editor");
   const canDelete = hasRole("admin");
+
+  // counts for header
+  const displayCount =
+    viewMode === "flat"
+      ? filtered.length
+      : selectedFolder
+        ? folderItems.length
+        : folderMap.size;
+
+  const totalCount = data?.length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -277,9 +319,7 @@ export default function AssetsPage() {
                       {p.status === "queued" && (
                         <Badge variant="outline">Chờ</Badge>
                       )}
-                      {p.status === "done" && (
-                        <Badge>Xong</Badge>
-                      )}
+                      {p.status === "done" && <Badge>Xong</Badge>}
                       {p.status === "error" && (
                         <Badge
                           variant="destructive"
@@ -312,15 +352,61 @@ export default function AssetsPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
+            <div className="space-y-1">
               <CardTitle className="text-lg">
-                Tất cả asset ({data?.length ?? 0})
+                {viewMode === "folder" && selectedFolder ? (
+                  <span className="flex items-center gap-1.5">
+                    <button
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => setSelectedFolder(null)}
+                    >
+                      Folder
+                    </button>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-mono text-base">{selectedFolder}</span>
+                  </span>
+                ) : (
+                  `Tất cả asset (${totalCount})`
+                )}
               </CardTitle>
               <CardDescription>
-                Hiển thị {filtered.length} / {data?.length ?? 0} mục
+                {viewMode === "flat"
+                  ? `Hiển thị ${displayCount} / ${totalCount} mục`
+                  : selectedFolder
+                    ? `${displayCount} asset trong folder này`
+                    : `${displayCount} folder · ${filtered.length} asset`}
               </CardDescription>
             </div>
-            <div className="flex items-end gap-2">
+
+            <div className="flex flex-wrap items-end gap-2">
+              {/* View mode toggle */}
+              <div className="flex overflow-hidden rounded-md border">
+                <Button
+                  variant={viewMode === "flat" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none border-0"
+                  onClick={() => {
+                    setViewMode("flat");
+                    setSelectedFolder(null);
+                  }}
+                >
+                  <LayoutList className="mr-1.5 h-3.5 w-3.5" />
+                  Tất cả
+                </Button>
+                <Button
+                  variant={viewMode === "folder" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none border-0 border-l"
+                  onClick={() => {
+                    setViewMode("folder");
+                    setSelectedFolder(null);
+                  }}
+                >
+                  <Folder className="mr-1.5 h-3.5 w-3.5" />
+                  Theo folder
+                </Button>
+              </div>
+
               <div>
                 <Label className="mb-1.5 block text-xs">Loại</Label>
                 <Select
@@ -351,6 +437,7 @@ export default function AssetsPage() {
             </div>
           </div>
         </CardHeader>
+
         <CardContent>
           {isLoading ? (
             <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
@@ -362,24 +449,120 @@ export default function AssetsPage() {
             <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               {extractError(error)}
             </div>
-          ) : filtered.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              Không có asset nào khớp bộ lọc.
-            </p>
-          ) : (
-            <AssetGrid
-              items={filtered}
-              canDelete={canDelete}
-              onDelete={(key) => {
-                if (confirm(`Xoá vĩnh viễn "${key}"?`)) {
-                  deleteMut.mutate(key);
-                }
-              }}
-              deleting={deleteMut.isPending}
+          ) : viewMode === "folder" && !selectedFolder ? (
+            <FolderGrid
+              folderMap={folderMap}
+              onSelectFolder={setSelectedFolder}
             />
+          ) : (
+            <>
+              {viewMode === "folder" && selectedFolder && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mb-4 -ml-2"
+                  onClick={() => setSelectedFolder(null)}
+                >
+                  ← Quay lại danh sách folder
+                </Button>
+              )}
+              {(viewMode === "flat" ? filtered : folderItems).length === 0 ? (
+                <p className="py-12 text-center text-sm text-muted-foreground">
+                  Không có asset nào khớp bộ lọc.
+                </p>
+              ) : (
+                <AssetGrid
+                  items={viewMode === "flat" ? filtered : folderItems}
+                  canDelete={canDelete}
+                  onDelete={(key) => {
+                    if (confirm(`Xoá vĩnh viễn "${key}"?`)) {
+                      deleteMut.mutate(key);
+                    }
+                  }}
+                  deleting={deleteMut.isPending}
+                />
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function FolderGrid({
+  folderMap,
+  onSelectFolder,
+}: {
+  folderMap: Map<string, AssetItem[]>;
+  onSelectFolder: (folder: string) => void;
+}) {
+  if (folderMap.size === 0) {
+    return (
+      <p className="py-12 text-center text-sm text-muted-foreground">
+        Không có folder nào khớp bộ lọc.
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+      {Array.from(folderMap.entries()).map(([folder, items]) => {
+        const imageCount = items.filter((a: AssetItem) => a.type === "image").length;
+        const audioCount = items.filter((a: AssetItem) => a.type === "audio").length;
+        const previewImage = items.find((a: AssetItem) => a.type === "image");
+
+        return (
+          <button
+            key={folder}
+            type="button"
+            onClick={() => onSelectFolder(folder)}
+            className="group flex flex-col overflow-hidden rounded-lg border bg-card text-left transition hover:border-primary/60 hover:shadow-sm"
+          >
+            {/* Thumbnail strip */}
+            <div className="relative flex h-24 items-center justify-center overflow-hidden bg-muted">
+              {previewImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewImage.url}
+                  alt={folder}
+                  className="h-full w-full object-cover opacity-60 transition group-hover:opacity-80"
+                />
+              ) : (
+                <Music className="h-10 w-10 text-muted-foreground/50" />
+              )}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <FolderOpen className="h-10 w-10 text-primary/70 drop-shadow" />
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="flex flex-col gap-1 p-3">
+              <p
+                className="truncate font-mono text-xs font-medium"
+                title={folder}
+              >
+                {folder}
+              </p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{items.length} file</span>
+                {imageCount > 0 && (
+                  <span className="flex items-center gap-0.5">
+                    <ImageIcon className="h-3 w-3" />
+                    {imageCount}
+                  </span>
+                )}
+                {audioCount > 0 && (
+                  <span className="flex items-center gap-0.5">
+                    <Music className="h-3 w-3" />
+                    {audioCount}
+                  </span>
+                )}
+              </div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
