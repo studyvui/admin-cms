@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, ArrowRight } from "lucide-react";
+import { Plus, Pencil, ArrowRight, Trash2 } from "lucide-react";
 import { coursesApi } from "@/lib/api/courses";
 import { lessonsApi } from "@/lib/api/lessons";
 import type { Lesson, LessonStatus } from "@/lib/types";
@@ -130,6 +130,12 @@ export default function LessonsPage() {
       queryClient.invalidateQueries({ queryKey: ["lessons"] }),
   });
 
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => lessonsApi.delete(id),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["lessons"] }),
+  });
+
   if (!hydrated) return null;
   if (!hasRole("admin", "editor", "qa")) {
     return (
@@ -141,6 +147,7 @@ export default function LessonsPage() {
 
   const canWrite = hasRole("admin");
   const canChangeStatus = hasRole("admin", "qa");
+  const canDelete = hasRole("admin");
 
   const onSubmit = (values: LessonFormValues) => {
     const skills = values.skillsCsv
@@ -287,7 +294,7 @@ export default function LessonsPage() {
                   <TableHead>Lesson Type</TableHead>
                   <TableHead>Skills</TableHead>
                   <TableHead>Trạng thái</TableHead>
-                  <TableHead className="w-40 text-right">Thao tác</TableHead>
+                  <TableHead className="w-52 text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -347,6 +354,26 @@ export default function LessonsPage() {
                               }}
                             >
                               <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={deleteMut.isPending}
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Xoá bài học "${l.code}"? Toàn bộ câu hỏi thuộc bài này sẽ không còn truy cập được. Thao tác này không thể hoàn tác.`,
+                                  )
+                                ) {
+                                  deleteMut.mutate(l.id);
+                                }
+                              }}
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              title="Xoá bài học"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
