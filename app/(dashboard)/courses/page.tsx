@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,6 +58,21 @@ const courseSchema = z.object({
 });
 
 type CourseFormValues = z.infer<typeof courseSchema>;
+
+const SUBJECT_LABEL: Record<string, string> = {
+  english: "Tiếng Anh",
+  math: "Toán",
+};
+
+function buildCourseName(subject: string, grade: number): string {
+  if (!subject || !grade || grade < 1) return "";
+  return `${SUBJECT_LABEL[subject] ?? subject} Lớp ${grade}`;
+}
+
+function buildCourseCode(subject: string, grade: number): string {
+  if (!subject || !grade || grade < 1) return "";
+  return `${subject}_grade${grade}`;
+}
 
 export default function CoursesPage() {
   const { hasRole, hydrated } = useAuth();
@@ -284,6 +299,20 @@ function CourseDialog({
         },
   });
 
+  const watchedSubject = watch("subject");
+  const watchedGrade = watch("grade");
+
+  useEffect(() => {
+    if (!editing) {
+      setValue("name", buildCourseName(watchedSubject, watchedGrade), {
+        shouldValidate: true,
+      });
+      setValue("code", buildCourseCode(watchedSubject, watchedGrade), {
+        shouldValidate: true,
+      });
+    }
+  }, [editing, watchedSubject, watchedGrade, setValue]);
+
   return (
     <Dialog
       open={open}
@@ -300,24 +329,10 @@ function CourseDialog({
           <DialogDescription>
             {editing
               ? "Code/môn/lớp không thay đổi sau khi tạo."
-              : "Sau khi tạo, code không thể sửa."}
+              : "Tên và Code tự động sinh từ Môn + Lớp. Không thay đổi sau khi tạo."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="code">Code</Label>
-            <Input
-              id="code"
-              placeholder="english_grade1"
-              disabled={!!editing}
-              {...register("code")}
-            />
-            {errors.code && (
-              <p className="text-xs text-destructive">
-                {errors.code.message}
-              </p>
-            )}
-          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Môn</Label>
@@ -353,12 +368,39 @@ function CourseDialog({
             <Label htmlFor="name">Tên hiển thị</Label>
             <Input
               id="name"
-              placeholder="Tiếng Anh Lớp 1"
+              readOnly
+              disabled={!!editing}
+              className="cursor-not-allowed bg-muted text-muted-foreground"
               {...register("name")}
             />
             {errors.name && (
               <p className="text-xs text-destructive">
                 {errors.name.message}
+              </p>
+            )}
+            {!editing && (
+              <p className="text-xs text-muted-foreground">
+                Tự động sinh từ Môn và Lớp. Không thể chỉnh sửa.
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="code">Code</Label>
+            <Input
+              id="code"
+              readOnly
+              disabled={!!editing}
+              className="cursor-not-allowed bg-muted font-mono text-sm text-muted-foreground"
+              {...register("code")}
+            />
+            {errors.code && (
+              <p className="text-xs text-destructive">
+                {errors.code.message}
+              </p>
+            )}
+            {!editing && (
+              <p className="text-xs text-muted-foreground">
+                Tự động sinh từ Môn và Lớp. Không thể chỉnh sửa.
               </p>
             )}
           </div>
