@@ -519,7 +519,7 @@ function QuestionDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: Question | null;
-  lessons: { id: string; code: string; name: string }[];
+  lessons: { id: string; code: string; name: string; skills: string[] }[];
   onSubmit: (values: QuestionFormValues) => void;
   submitting: boolean;
   error: string | null;
@@ -604,6 +604,11 @@ function QuestionDialog({
     enabled: !!watchedLessonId && !editing,
   });
 
+  const lessonSkills = useMemo(
+    () => lessons.find((l) => l.id === watchedLessonId)?.skills ?? [],
+    [watchedLessonId, lessons],
+  );
+
   useEffect(() => {
     if (editing || !watchedLessonId) return;
     const lesson = lessons.find((l) => l.id === watchedLessonId);
@@ -613,6 +618,9 @@ function QuestionDialog({
       (lessonQuestions ?? []).map((q) => q.code),
     );
     setValue("code", code, { shouldValidate: true });
+    if (lesson.skills.length > 0) {
+      setValue("skill", lesson.skills[0], { shouldValidate: true });
+    }
   }, [editing, watchedLessonId, lessonQuestions, lessons, setValue]);
 
   return (
@@ -705,7 +713,27 @@ function QuestionDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="skill">Skill</Label>
-              <Input id="skill" {...register("skill")} />
+              {!editing && lessonSkills.length > 0 ? (
+                <Select
+                  value={watch("skill")}
+                  onValueChange={(v) =>
+                    setValue("skill", v, { shouldValidate: true })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn skill" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lessonSkills.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input id="skill" {...register("skill")} />
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="difficulty">Độ khó (1-5)</Label>
