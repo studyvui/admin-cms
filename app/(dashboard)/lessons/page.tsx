@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,7 +8,7 @@ import { z } from "zod";
 import { Plus, Pencil, ArrowRight, Trash2 } from "lucide-react";
 import { coursesApi } from "@/lib/api/courses";
 import { lessonsApi } from "@/lib/api/lessons";
-import type { Lesson, LessonStatus } from "@/lib/types";
+import type { Course, Lesson, LessonStatus } from "@/lib/types";
 import { extractError } from "@/lib/errors";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -394,7 +394,7 @@ export default function LessonsPage() {
           if (!o) setEditing(null);
         }}
         editing={editing}
-        courses={courses ?? []}
+        courses={(courses ?? []) as Course[]}
         onSubmit={onSubmit}
         submitting={createMut.isPending || updateMut.isPending}
         error={
@@ -409,6 +409,22 @@ export default function LessonsPage() {
   );
 }
 
+const SUBJECT_CODE: Record<string, string> = { english: "ENG", math: "MATH" };
+
+function buildCode(
+  courses: Course[],
+  courseId: string,
+  week: number,
+  orderIndex: number,
+): string {
+  const course = courses.find((c) => c.id === courseId);
+  if (!course || !week || week < 1) return "";
+  const w = String(week).padStart(2, "0");
+  const sub = SUBJECT_CODE[course.subject] ?? course.subject.toUpperCase();
+  const suffix = orderIndex > 1 ? `_${orderIndex}` : "";
+  return `G${course.grade}_W${w}_${sub}${suffix}`;
+}
+
 function LessonDialog({
   open,
   onOpenChange,
@@ -421,7 +437,7 @@ function LessonDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: Lesson | null;
-  courses: { id: string; name: string }[];
+  courses: Course[];
   onSubmit: (values: LessonFormValues) => void;
   submitting: boolean;
   error: string | null;
@@ -462,6 +478,18 @@ function LessonDialog({
     values: defaults,
   });
 
+  const watchedCourseId = watch("courseId");
+  const watchedWeek = watch("week");
+  const watchedOrderIndex = watch("orderIndex");
+
+  // Auto-generate code khi tạo mới (không cho phép sửa khi editing)
+  useEffect(() => {
+    if (!editing) {
+      const code = buildCode(courses, watchedCourseId, watchedWeek, watchedOrderIndex);
+      setValue("code", code, { shouldValidate: true });
+    }
+  }, [editing, watchedCourseId, watchedWeek, watchedOrderIndex, courses, setValue]);
+
   return (
     <Dialog
       open={open}
@@ -476,10 +504,11 @@ function LessonDialog({
             {editing ? "Sửa bài học" : "Thêm bài học mới"}
           </DialogTitle>
           <DialogDescription>
-            Code và Course không thay đổi sau khi tạo.
+            Code tự động sinh từ Khoá học + Tuần. Không thay đổi sau khi tạo.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* 1. Khoá học */}
           <div className="space-y-2">
             <Label>Khoá học</Label>
             <Select
@@ -506,20 +535,8 @@ function LessonDialog({
               </p>
             )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="code">Code</Label>
-            <Input
-              id="code"
-              placeholder="G1_W01_VOCAB_GREETINGS"
-              disabled={!!editing}
-              {...register("code")}
-            />
-            {errors.code && (
-              <p className="text-xs text-destructive">
-                {errors.code.message}
-              </p>
-            )}
-          </div>
+
+          {/* 2. Tuần + Thứ tự trong tuần */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="week">Tuần</Label>
@@ -541,6 +558,30 @@ function LessonDialog({
               />
             </div>
           </div>
+
+          {/* 3. Code — tự sinh, chỉ đọc */}
+          <div className="space-y-2">
+            <Label htmlFor="code">Code</Label>
+            <Input
+              id="code"
+              readOnly
+              disabled={!!editing}
+              className="cursor-not-allowed bg-muted font-mono text-sm text-muted-foreground"
+              {...register("code")}
+            />
+            {!editing && (
+              <p className="text-xs text-muted-foreground">
+                Tự động sinh từ Khoá học và Tuần. Không thể chỉnh sửa.
+              </p>
+            )}
+            {errors.code && (
+              <p className="text-xs text-destructive">
+                {errors.code.message}
+              </p>
+            )}
+          </div>
+
+          {/* 4. Tên bài học */}
           <div className="space-y-2">
             <Label htmlFor="name">Tên bài học</Label>
             <Input
@@ -554,6 +595,8 @@ function LessonDialog({
               </p>
             )}
           </div>
+
+          {/* 5. Lesson Type */}
           <div className="space-y-2">
             <Label htmlFor="lessonType">Lesson Type</Label>
             <Input
@@ -562,6 +605,8 @@ function LessonDialog({
               {...register("lessonType")}
             />
           </div>
+
+          {/* 6. Skills */}
           <div className="space-y-2">
             <Label htmlFor="skillsCsv">Skills (cách nhau bằng dấu phẩy)</Label>
             <Input
@@ -575,6 +620,7 @@ function LessonDialog({
               </p>
             )}
           </div>
+
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
