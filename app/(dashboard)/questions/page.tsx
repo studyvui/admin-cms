@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -61,6 +61,19 @@ const STATUS_FLOW: Record<QuestionStatus, QuestionStatus[]> = {
   published: ["deprecated"],
   deprecated: [],
 };
+
+function nextQuestionCode(lessonCode: string, existingCodes: string[]): string {
+  const prefix = `${lessonCode}_`;
+  const usedNums = new Set(
+    existingCodes
+      .filter((c) => c.startsWith(prefix))
+      .map((c) => parseInt(c.slice(prefix.length), 10))
+      .filter((n) => !isNaN(n) && n > 0),
+  );
+  let seq = 1;
+  while (usedNums.has(seq)) seq++;
+  return `${lessonCode}_${String(seq).padStart(3, "0")}`;
+}
 
 const QUESTION_TYPES = [
   "multiple_choice",
@@ -583,6 +596,24 @@ function QuestionDialog({
   });
 
   const mode = watch("mode");
+  const watchedLessonId = watch("lessonId");
+
+  const { data: lessonQuestions } = useQuery({
+    queryKey: ["questions", "by-lesson", watchedLessonId],
+    queryFn: () => questionsApi.list({ lessonId: watchedLessonId }),
+    enabled: !!watchedLessonId && !editing,
+  });
+
+  useEffect(() => {
+    if (editing || !watchedLessonId) return;
+    const lesson = lessons.find((l) => l.id === watchedLessonId);
+    if (!lesson) return;
+    const code = nextQuestionCode(
+      lesson.code,
+      (lessonQuestions ?? []).map((q) => q.code),
+    );
+    setValue("code", code, { shouldValidate: true });
+  }, [editing, watchedLessonId, lessonQuestions, lessons, setValue]);
 
   return (
     <Dialog
@@ -633,13 +664,19 @@ function QuestionDialog({
               <Label htmlFor="code">Code câu hỏi</Label>
               <Input
                 id="code"
-                placeholder="G1_W01_VOCAB_001"
+                readOnly
                 disabled={!!editing}
+                className="cursor-not-allowed bg-muted font-mono text-sm text-muted-foreground"
                 {...register("code")}
               />
               {errors.code && (
                 <p className="text-xs text-destructive">
                   {errors.code.message}
+                </p>
+              )}
+              {!editing && (
+                <p className="text-xs text-muted-foreground">
+                  Tự động sinh từ bài học đã chọn.
                 </p>
               )}
             </div>
