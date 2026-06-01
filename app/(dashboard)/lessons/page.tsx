@@ -5,10 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, ArrowRight, Trash2, X } from "lucide-react";
+import { Plus, Pencil, ArrowRight, Trash2, X, ImageIcon, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { coursesApi } from "@/lib/api/courses";
 import { lessonsApi } from "@/lib/api/lessons";
+import { assetsApi } from "@/lib/api/assets";
+import { ImagePicker } from "@/components/asset-picker/image-picker";
+import { AudioPicker } from "@/components/asset-picker/audio-picker";
 import type { Course, Lesson, LessonStatus, VocabItem } from "@/lib/types";
 import { extractError } from "@/lib/errors";
 import { useAuth } from "@/hooks/use-auth";
@@ -576,6 +579,46 @@ function LessonDialog({
     name: "vocabulary",
   });
 
+  const vocabValues = watch("vocabulary");
+
+  // Picker state: which row and which field type is being picked
+  const [pickerState, setPickerState] = useState<{
+    type: "image" | "audio";
+    index: number;
+  } | null>(null);
+
+  const { data: imageAssets } = useQuery({
+    queryKey: ["assets", "image", undefined] as [string, string, undefined],
+    queryFn: () => assetsApi.list({ type: "image" }),
+    staleTime: 60_000,
+    enabled: pickerState?.type === "image",
+  });
+  const { data: audioAssets } = useQuery({
+    queryKey: ["assets", "audio", undefined] as [string, string, undefined],
+    queryFn: () => assetsApi.list({ type: "audio" }),
+    staleTime: 60_000,
+    enabled: pickerState?.type === "audio",
+  });
+
+  const handlePickerConfirm = (keys: string[]) => {
+    if (!pickerState || keys.length === 0) {
+      setPickerState(null);
+      return;
+    }
+    const { type, index } = pickerState;
+    const assets = type === "image" ? imageAssets : audioAssets;
+    const key = keys[0];
+    const url =
+      assets?.find((a) => a.key === key)?.url ??
+      `https://cdn.studyvui.vn/${key}`;
+    if (type === "image") {
+      setValue(`vocabulary.${index}.imageUrl`, url);
+    } else {
+      setValue(`vocabulary.${index}.audioUrl`, url);
+    }
+    setPickerState(null);
+  };
+
   // Auto-generate code khi tạo mới (không cho phép sửa khi editing)
   useEffect(() => {
     if (!editing) {
@@ -594,6 +637,7 @@ function LessonDialog({
   }, [isEnglishCourse]);
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(o) => {
@@ -770,8 +814,8 @@ function LessonDialog({
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-[1fr_2fr_2fr_2rem] gap-1.5 px-0.5">
                     <span className="text-xs text-muted-foreground">Từ vựng</span>
-                    <span className="text-xs text-muted-foreground">Hình ảnh (URL)</span>
-                    <span className="text-xs text-muted-foreground">Âm thanh (URL)</span>
+                    <span className="text-xs text-muted-foreground">Hình ảnh</span>
+                    <span className="text-xs text-muted-foreground">Âm thanh</span>
                     <span />
                   </div>
                   <div className="max-h-56 space-y-1.5 overflow-y-auto pr-0.5">
@@ -785,15 +829,25 @@ function LessonDialog({
                           {...register(`vocabulary.${index}.word`)}
                           className="h-8 text-sm"
                         />
-                        <Input
-                          placeholder="cdn.studyvui.vn/…"
-                          {...register(`vocabulary.${index}.imageUrl`)}
-                          className="h-8 text-sm"
+                        <VocabAssetField
+                          value={vocabValues[index]?.imageUrl ?? ""}
+                          type="image"
+                          onClear={() =>
+                            setValue(`vocabulary.${index}.imageUrl`, "")
+                          }
+                          onBrowse={() =>
+                            setPickerState({ type: "image", index })
+                          }
                         />
-                        <Input
-                          placeholder="cdn.studyvui.vn/…"
-                          {...register(`vocabulary.${index}.audioUrl`)}
-                          className="h-8 text-sm"
+                        <VocabAssetField
+                          value={vocabValues[index]?.audioUrl ?? ""}
+                          type="audio"
+                          onClear={() =>
+                            setValue(`vocabulary.${index}.audioUrl`, "")
+                          }
+                          onBrowse={() =>
+                            setPickerState({ type: "audio", index })
+                          }
                         />
                         <Button
                           type="button"
@@ -832,6 +886,76 @@ function LessonDialog({
         </form>
       </DialogContent>
     </Dialog>
+    <ImagePicker
+      open={pickerState?.type === "image"}
+      onOpenChange={(o) => { if (!o) setPickerState(null); }}
+      multiple={false}
+      onConfirm={handlePickerConfirm}
+    />
+    <AudioPicker
+      open={pickerState?.type === "audio"}
+      onOpenChange={(o) => { if (!o) setPickerState(null); }}
+      multiple={false}
+      onConfirm={handlePickerConfirm}
+    />
+    </>
+  );
+}
+
+function VocabAssetField({
+  value,
+  type,
+  onClear,
+  onBrowse,
+}: {
+  value: string;
+  type: "image" | "audio";
+  onClear: () => void;
+  onBrowse: () => void;
+}) {
+  const filename = value ? (value.split("/").pop() ?? value) : "";
+  return (
+    <div className="flex h-8 items-center overflow-hidden rounded-md border bg-background text-sm">
+      {value ? (
+        <>
+          {type === "image" && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={value}
+              alt=""
+              className="h-8 w-8 shrink-0 border-r object-cover"
+            />
+          )}
+          <span className="min-w-0 flex-1 truncate px-1.5 text-xs">
+            {filename}
+          </span>
+          <button
+            type="button"
+            onClick={onClear}
+            className="shrink-0 px-1 text-muted-foreground hover:text-destructive"
+            title="Xoá"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </>
+      ) : (
+        <span className="flex-1 px-2 text-xs text-muted-foreground">
+          {type === "image" ? "Chưa có ảnh" : "Chưa có audio"}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={onBrowse}
+        className="shrink-0 border-l px-1.5 text-muted-foreground hover:text-foreground"
+        title={type === "image" ? "Chọn ảnh từ kho" : "Chọn audio từ kho"}
+      >
+        {type === "image" ? (
+          <ImageIcon className="h-3.5 w-3.5" />
+        ) : (
+          <Music className="h-3.5 w-3.5" />
+        )}
+      </button>
+    </div>
   );
 }
 
