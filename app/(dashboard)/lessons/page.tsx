@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Pencil, ArrowRight, Trash2 } from "lucide-react";
@@ -46,6 +46,69 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/shared/status-badge";
+
+const LESSON_TYPE_LABELS: Record<string, string> = {
+  // Số học
+  counting:          "Đếm số",
+  compare_quantity:  "So sánh số lượng qua hình",
+  comparison:        "So sánh dấu > < =",
+  number_decompose:  "Tách gộp số",
+  sequence:          "Dãy số quy luật",
+  sort_numbers:      "Sắp xếp dãy số",
+  write_equation:    "Nhìn hình viết phép tính",
+  complete_table:    "Hoàn thành bảng cộng/trừ",
+  chain_calculation: "Chuỗi phép tính kết hợp",
+  find_missing_number: "Tìm số ẩn",
+  calculation:       "Tính kết quả",
+  fill_blank:        "Điền số còn thiếu",
+  word_problem:      "Toán có lời văn",
+  // Hình học
+  classify_2d:       "Phân loại hình phẳng",
+  assemble_shapes:   "Lắp ghép / Xếp hình",
+  shape_pattern:     "Quy luật chuỗi hình",
+  match_object_shape: "Nối đồ vật với hình/khối",
+  classify_3d:       "Phân loại hình khối 3D",
+  spatial_orientation: "Vị trí không gian",
+  geometry:          "Hình học tổng quát",
+  // Tiếng Anh
+  vocabulary:        "Từ vựng",
+  phonics:           "Phonics",
+  image_choice:      "Chọn hình",
+  missing_letter:    "Điền chữ còn thiếu",
+  audio_choice:      "Nghe và chọn",
+  reorder:           "Sắp xếp câu",
+  match_word:        "Nối từ",
+  // Đặc biệt
+  review:            "Ôn tập",
+  boss:              "Boss Challenge",
+};
+
+const LESSON_TYPE_OPTIONS = Object.entries(LESSON_TYPE_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+const SKILL_LABELS: Record<string, string> = {
+  counting:            "Đếm số",
+  number_recognition:  "Nhận diện số",
+  sequence:            "Dãy số",
+  pattern_recognition: "Nhận dạng quy luật",
+  comparison:          "So sánh",
+  logic_reasoning:     "Tư duy logic",
+  number_decomposition: "Tách gộp số",
+  addition:            "Phép cộng",
+  subtraction:         "Phép trừ",
+  mental_math:         "Tính nhẩm",
+  "2d_shapes":         "Hình phẳng 2D",
+  spatial_reasoning:   "Tư duy không gian",
+  "3d_shapes":         "Hình khối 3D",
+  fill_blank:          "Điền số",
+  word_problem:        "Lời văn",
+  geometry:            "Hình học",
+  calculation:         "Tính toán",
+  vocab:               "Từ vựng",
+  listening:           "Nghe",
+  phonics:             "Phonics",
+};
 
 const STATUS_FLOW: Record<LessonStatus, LessonStatus[]> = {
   draft: ["review"],
@@ -291,8 +354,8 @@ export default function LessonsPage() {
                   <TableHead>Code</TableHead>
                   <TableHead>Tuần</TableHead>
                   <TableHead>Tên</TableHead>
-                  <TableHead>Lesson Type</TableHead>
-                  <TableHead>Skills</TableHead>
+                  <TableHead>Loại bài học</TableHead>
+                  <TableHead>Kỹ năng</TableHead>
                   <TableHead>Trạng thái</TableHead>
                   <TableHead className="w-52 text-right">Thao tác</TableHead>
                 </TableRow>
@@ -308,7 +371,9 @@ export default function LessonsPage() {
                       <TableCell>W{l.week}</TableCell>
                       <TableCell className="font-medium">{l.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{l.lessonType}</Badge>
+                        <Badge variant="outline">
+                          {LESSON_TYPE_LABELS[l.lessonType] ?? l.lessonType}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -318,7 +383,7 @@ export default function LessonsPage() {
                               variant="secondary"
                               className="text-xs"
                             >
-                              {s}
+                              {SKILL_LABELS[s] ?? s}
                             </Badge>
                           ))}
                         </div>
@@ -473,6 +538,7 @@ function LessonDialog({
     setValue,
     watch,
     reset,
+    control,
   } = useForm<LessonFormValues>({
     resolver: zodResolver(lessonSchema),
     values: defaults,
@@ -598,12 +664,30 @@ function LessonDialog({
 
           {/* 5. Lesson Type */}
           <div className="space-y-2">
-            <Label htmlFor="lessonType">Lesson Type</Label>
-            <Input
-              id="lessonType"
-              placeholder="vocabulary | phonics | counting | ..."
-              {...register("lessonType")}
+            <Label htmlFor="lessonType">Loại bài học</Label>
+            <Controller
+              name="lessonType"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="lessonType">
+                    <SelectValue placeholder="Chọn loại bài học..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LESSON_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             />
+            {errors.lessonType && (
+              <p className="text-xs text-destructive">
+                {errors.lessonType.message}
+              </p>
+            )}
           </div>
 
           {/* 6. Skills */}
