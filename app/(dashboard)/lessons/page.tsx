@@ -144,7 +144,7 @@ const lessonSchema = z.object({
   name: z.string().min(1, "Bắt buộc"),
   lessonType: z.string().min(1, "Bắt buộc"),
   skillsCsv: z.string().min(1, "Ít nhất 1 skill"),
-  vocabulary: z.array(vocabItemSchema).default([]),
+  vocabulary: z.array(vocabItemSchema),
 });
 
 type LessonFormValues = z.infer<typeof lessonSchema>;
