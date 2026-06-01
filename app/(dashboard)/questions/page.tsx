@@ -100,18 +100,28 @@ const SKILL_LABELS: Record<string, string> = {
   phonics:             "Phonics",
 };
 
-const QUESTION_TYPES = [
-  "multiple_choice",
-  "image_choice",
-  "audio_choice",
-  "missing_letter",
-  "fill_blank",
-  "matching",
-  "reorder",
-  "count_objects",
-  "number_recognition",
-  "compare_numbers",
-];
+const QUESTION_TYPE_LABELS: Record<string, string> = {
+  multiple_choice:   "Trắc nghiệm",
+  image_choice:      "Chọn hình",
+  audio_choice:      "Nghe và chọn",
+  missing_letter:    "Điền chữ còn thiếu",
+  fill_blank:        "Điền số còn thiếu",
+  matching:          "Nối từ",
+  reorder:           "Sắp xếp câu",
+  count_objects:     "Đếm đồ vật",
+  number_recognition: "Nhận diện số",
+  compare_numbers:   "So sánh số",
+};
+
+const QUESTION_STATUS_LABELS: Record<QuestionStatus, string> = {
+  draft:      "Nháp",
+  review:     "Chờ duyệt",
+  approved:   "Đã duyệt",
+  published:  "Xuất bản",
+  deprecated: "Ngừng dùng",
+};
+
+const QUESTION_TYPES = Object.keys(QUESTION_TYPE_LABELS);
 
 const baseSchema = z.object({
   lessonId: z.string().uuid("Chọn bài học"),
@@ -489,10 +499,10 @@ export default function QuestionsPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
-                          {q.type}
+                          {QUESTION_TYPE_LABELS[q.type] ?? q.type}
                         </Badge>
                       </TableCell>
-                      <TableCell>{q.skill}</TableCell>
+                      <TableCell>{SKILL_LABELS[q.skill] ?? q.skill}</TableCell>
                       <TableCell>{q.difficulty}</TableCell>
                       <TableCell
                         className="max-w-[200px] truncate"
@@ -517,7 +527,7 @@ export default function QuestionsPage() {
                                 }
                               >
                                 <ArrowRight className="mr-1 h-3 w-3" />
-                                {next}
+                                {QUESTION_STATUS_LABELS[next] ?? next}
                               </Button>
                             ))}
                           <Button
@@ -843,7 +853,7 @@ function QuestionDialog({
                 <SelectContent>
                   {QUESTION_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {QUESTION_TYPE_LABELS[t] ?? t}
                     </SelectItem>
                   ))}
                 </SelectContent>
