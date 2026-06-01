@@ -2,14 +2,14 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Pencil, ArrowRight, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { coursesApi } from "@/lib/api/courses";
 import { lessonsApi } from "@/lib/api/lessons";
-import type { Course, Lesson, LessonStatus } from "@/lib/types";
+import type { Course, Lesson, LessonStatus, VocabItem } from "@/lib/types";
 import { extractError } from "@/lib/errors";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -127,6 +127,12 @@ const STATUS_FLOW: Record<LessonStatus, LessonStatus[]> = {
   archived: [],
 };
 
+const vocabItemSchema = z.object({
+  word: z.string().min(1, "Bắt buộc"),
+  imageUrl: z.string().optional(),
+  audioUrl: z.string().optional(),
+});
+
 const lessonSchema = z.object({
   courseId: z.string().uuid("Chọn khoá học"),
   code: z
@@ -138,6 +144,7 @@ const lessonSchema = z.object({
   name: z.string().min(1, "Bắt buộc"),
   lessonType: z.string().min(1, "Bắt buộc"),
   skillsCsv: z.string().min(1, "Ít nhất 1 skill"),
+  vocabulary: z.array(vocabItemSchema).default([]),
 });
 
 type LessonFormValues = z.infer<typeof lessonSchema>;
@@ -187,6 +194,7 @@ export default function LessonsPage() {
           .filter(Boolean),
         week: input.values.week,
         orderIndex: input.values.orderIndex,
+        vocabulary: input.values.vocabulary?.length ? input.values.vocabulary : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["lessons"] });
@@ -237,6 +245,7 @@ export default function LessonsPage() {
         name: values.name,
         lessonType: values.lessonType,
         skills,
+        vocabulary: values.vocabulary?.length ? values.vocabulary : undefined,
       });
     }
   };
@@ -527,6 +536,7 @@ function LessonDialog({
             name: editing.name,
             lessonType: editing.lessonType,
             skillsCsv: editing.skills.join(", "),
+            vocabulary: (editing.vocabulary ?? []) as VocabItem[],
           }
         : {
             courseId: courses[0]?.id ?? "",
@@ -535,7 +545,8 @@ function LessonDialog({
             orderIndex: 1,
             name: "",
             lessonType: "vocabulary",
-            skillsCsv: "vocab",
+            skillsCsv: "vocab, listening",
+            vocabulary: [],
           },
     [editing, courses],
   );
@@ -557,6 +568,14 @@ function LessonDialog({
   const watchedWeek = watch("week");
   const watchedOrderIndex = watch("orderIndex");
 
+  const selectedCourse = courses.find((c) => c.id === watchedCourseId);
+  const isEnglishCourse = selectedCourse?.subject === "english";
+
+  const { fields: vocabFields, append: appendVocab, remove: removeVocab } = useFieldArray({
+    control,
+    name: "vocabulary",
+  });
+
   // Auto-generate code khi tạo mới (không cho phép sửa khi editing)
   useEffect(() => {
     if (!editing) {
@@ -564,6 +583,15 @@ function LessonDialog({
       setValue("code", code, { shouldValidate: true });
     }
   }, [editing, watchedCourseId, watchedWeek, watchedOrderIndex, courses, setValue]);
+
+  // Khi chuyển sang khoá học Tiếng Anh → tự động chọn loại & kỹ năng phù hợp
+  useEffect(() => {
+    if (!editing && isEnglishCourse) {
+      setValue("lessonType", "vocabulary", { shouldValidate: false });
+      setValue("skillsCsv", "vocab, listening", { shouldValidate: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEnglishCourse]);
 
   return (
     <Dialog
@@ -573,7 +601,7 @@ function LessonDialog({
         if (!o) reset();
       }}
     >
-      <DialogContent>
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Sửa bài học" : "Thêm bài học mới"}
@@ -715,6 +743,74 @@ function LessonDialog({
               </p>
             )}
           </div>
+
+          {/* 7. Từ vựng — chỉ hiển thị cho khoá học Tiếng Anh */}
+          {isEnglishCourse && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Từ vựng bài học</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    appendVocab({ word: "", imageUrl: "", audioUrl: "" })
+                  }
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Thêm từ
+                </Button>
+              </div>
+
+              {vocabFields.length === 0 ? (
+                <p className="py-2 text-center text-xs text-muted-foreground">
+                  Chưa có từ vựng. Nhấn &ldquo;Thêm từ&rdquo; để bắt đầu.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-[1fr_2fr_2fr_2rem] gap-1.5 px-0.5">
+                    <span className="text-xs text-muted-foreground">Từ vựng</span>
+                    <span className="text-xs text-muted-foreground">Hình ảnh (URL)</span>
+                    <span className="text-xs text-muted-foreground">Âm thanh (URL)</span>
+                    <span />
+                  </div>
+                  <div className="max-h-56 space-y-1.5 overflow-y-auto pr-0.5">
+                    {vocabFields.map((field, index) => (
+                      <div
+                        key={field.id}
+                        className="grid grid-cols-[1fr_2fr_2fr_2rem] gap-1.5 items-center"
+                      >
+                        <Input
+                          placeholder="apple"
+                          {...register(`vocabulary.${index}.word`)}
+                          className="h-8 text-sm"
+                        />
+                        <Input
+                          placeholder="cdn.studyvui.vn/…"
+                          {...register(`vocabulary.${index}.imageUrl`)}
+                          className="h-8 text-sm"
+                        />
+                        <Input
+                          placeholder="cdn.studyvui.vn/…"
+                          {...register(`vocabulary.${index}.audioUrl`)}
+                          className="h-8 text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeVocab(index)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

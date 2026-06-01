@@ -66,6 +66,12 @@ export interface UpdateCourseInput {
   isActive?: boolean;
 }
 
+export interface VocabItem {
+  word: string;
+  imageUrl?: string;
+  audioUrl?: string;
+}
+
 export interface Lesson {
   id: string;
   courseId: string;
@@ -77,6 +83,7 @@ export interface Lesson {
   skills: string[];
   status: LessonStatus;
   isPremium: boolean;
+  vocabulary?: VocabItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -89,6 +96,7 @@ export interface CreateLessonInput {
   name: string;
   lessonType: string;
   skills: string[];
+  vocabulary?: VocabItem[];
 }
 
 export interface UpdateLessonInput {
@@ -97,6 +105,7 @@ export interface UpdateLessonInput {
   skills?: string[];
   week?: number;
   orderIndex?: number;
+  vocabulary?: VocabItem[];
 }
 
 export interface Question {
