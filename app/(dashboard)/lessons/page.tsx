@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, ArrowRight, Trash2 } from "lucide-react";
+import { Plus, Pencil, ArrowRight, Trash2, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { coursesApi } from "@/lib/api/courses";
 import { lessonsApi } from "@/lib/api/lessons";
 import type { Course, Lesson, LessonStatus } from "@/lib/types";
@@ -108,6 +109,14 @@ const SKILL_LABELS: Record<string, string> = {
   vocab:               "Từ vựng",
   listening:           "Nghe",
   phonics:             "Phonics",
+};
+
+const STATUS_LABELS: Record<LessonStatus, string> = {
+  draft:    "Nháp",
+  review:   "Chờ duyệt",
+  approved: "Đã duyệt",
+  published: "Xuất bản",
+  archived: "Lưu trữ",
 };
 
 const STATUS_FLOW: Record<LessonStatus, LessonStatus[]> = {
@@ -403,10 +412,10 @@ export default function LessonsPage() {
                                 onClick={() =>
                                   statusMut.mutate({ id: l.id, status: next })
                                 }
-                                title={`Chuyển → ${next}`}
+                                title={`Chuyển → ${STATUS_LABELS[next]}`}
                               >
                                 <ArrowRight className="mr-1 h-3 w-3" />
-                                {next}
+                                {STATUS_LABELS[next]}
                               </Button>
                             ))}
                           {canWrite && (
@@ -692,11 +701,13 @@ function LessonDialog({
 
           {/* 6. Skills */}
           <div className="space-y-2">
-            <Label htmlFor="skillsCsv">Skills (cách nhau bằng dấu phẩy)</Label>
-            <Input
-              id="skillsCsv"
-              placeholder="vocab, listening"
-              {...register("skillsCsv")}
+            <Label>Kỹ năng</Label>
+            <Controller
+              name="skillsCsv"
+              control={control}
+              render={({ field }) => (
+                <SkillPicker value={field.value} onChange={field.onChange} />
+              )}
             />
             {errors.skillsCsv && (
               <p className="text-xs text-destructive">
@@ -725,5 +736,107 @@ function LessonDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SkillPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (csv: string) => void;
+}) {
+  const [customInput, setCustomInput] = useState("");
+
+  const selected = useMemo(
+    () => new Set(value.split(",").map((s) => s.trim()).filter(Boolean)),
+    [value],
+  );
+
+  const knownKeys = useMemo(() => new Set(Object.keys(SKILL_LABELS)), []);
+
+  const customSkills = useMemo(
+    () => Array.from(selected).filter((s) => !knownKeys.has(s)),
+    [selected, knownKeys],
+  );
+
+  const update = (next: Set<string>) => onChange(Array.from(next).join(", "));
+
+  const toggle = (key: string) => {
+    const next = new Set(selected);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    update(next);
+  };
+
+  const removeCustom = (key: string) => {
+    const next = new Set(selected);
+    next.delete(key);
+    update(next);
+  };
+
+  const addCustom = () => {
+    const trimmed = customInput.trim();
+    if (!trimmed) return;
+    const next = new Set(selected);
+    next.add(trimmed);
+    update(next);
+    setCustomInput("");
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Known skills — toggle badges */}
+      <div className="flex flex-wrap gap-1.5 rounded-md border bg-muted/20 p-2.5">
+        {Object.entries(SKILL_LABELS).map(([key, label]) => (
+          <button
+            type="button"
+            key={key}
+            onClick={() => toggle(key)}
+            className={cn(
+              "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+              selected.has(key)
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Custom skills not in SKILL_LABELS */}
+      {customSkills.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {customSkills.map((s) => (
+            <span
+              key={s}
+              className="flex items-center gap-1 rounded-full border border-dashed border-amber-400 bg-amber-50 px-2 py-0.5 text-xs text-amber-700"
+            >
+              {s}
+              <button type="button" onClick={() => removeCustom(s)} className="hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Add custom skill */}
+      <div className="flex gap-2">
+        <Input
+          placeholder="Thêm kỹ năng tùy chỉnh..."
+          value={customInput}
+          onChange={(e) => setCustomInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); addCustom(); }
+          }}
+          className="h-8 text-xs"
+        />
+        <Button type="button" variant="outline" size="sm" onClick={addCustom}>
+          Thêm
+        </Button>
+      </div>
+    </div>
   );
 }
