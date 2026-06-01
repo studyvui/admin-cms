@@ -130,6 +130,10 @@ const STATUS_FLOW: Record<LessonStatus, LessonStatus[]> = {
   archived: [],
 };
 
+// Stable empty array — passed to asset pickers so their internal
+// useEffect([open, initialSelected]) doesn't loop on the default `[]` (React #185)
+const EMPTY_KEYS: string[] = [];
+
 const vocabItemSchema = z.object({
   word: z.string().min(1, "Bắt buộc"),
   imageUrl: z.string().optional(),
@@ -869,12 +873,14 @@ function LessonDialog({
           <ImagePicker
             open={pickerState?.type === "image"}
             onOpenChange={(o) => { if (!o) setPickerState(null); }}
+            initialSelected={EMPTY_KEYS}
             multiple={false}
             onConfirm={handlePickerConfirm}
           />
           <AudioPicker
             open={pickerState?.type === "audio"}
             onOpenChange={(o) => { if (!o) setPickerState(null); }}
+            initialSelected={EMPTY_KEYS}
             multiple={false}
             onConfirm={handlePickerConfirm}
           />
