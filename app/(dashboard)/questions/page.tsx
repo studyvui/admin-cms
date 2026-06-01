@@ -77,6 +77,29 @@ function nextQuestionCode(lessonCode: string, existingCodes: string[]): string {
   return `${lessonCode}_${String(seq).padStart(3, "0")}`;
 }
 
+const SKILL_LABELS: Record<string, string> = {
+  counting:            "Đếm số",
+  number_recognition:  "Nhận diện số",
+  sequence:            "Dãy số",
+  pattern_recognition: "Nhận dạng quy luật",
+  comparison:          "So sánh",
+  logic_reasoning:     "Tư duy logic",
+  number_decomposition: "Tách gộp số",
+  addition:            "Phép cộng",
+  subtraction:         "Phép trừ",
+  mental_math:         "Tính nhẩm",
+  "2d_shapes":         "Hình phẳng 2D",
+  spatial_reasoning:   "Tư duy không gian",
+  "3d_shapes":         "Hình khối 3D",
+  fill_blank:          "Điền số",
+  word_problem:        "Lời văn",
+  geometry:            "Hình học",
+  calculation:         "Tính toán",
+  vocab:               "Từ vựng",
+  listening:           "Nghe",
+  phonics:             "Phonics",
+};
+
 const QUESTION_TYPES = [
   "multiple_choice",
   "image_choice",
@@ -841,7 +864,7 @@ function QuestionDialog({
                   <SelectContent>
                     {lessonSkills.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {SKILL_LABELS[s] ?? s}
                       </SelectItem>
                     ))}
                   </SelectContent>
