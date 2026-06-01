@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, ArrowRight, ImageIcon, Music, X, Trash2 } from "lucide-react";
+import { Plus, Pencil, ArrowRight, ImageIcon, Music, X, Trash2, Play } from "lucide-react";
+import { QuestionPreviewModal } from "@/components/question-preview/question-preview-modal";
 import { lessonsApi } from "@/lib/api/lessons";
 import { ImagePicker } from "@/components/asset-picker/image-picker";
 import { AudioPicker } from "@/components/asset-picker/audio-picker";
@@ -137,6 +138,7 @@ export default function QuestionsPage() {
   }>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Question | null>(null);
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
 
   const { data: lessons } = useQuery({
     queryKey: ["lessons", "for-questions"],
@@ -442,6 +444,14 @@ export default function QuestionsPage() {
                                 {next}
                               </Button>
                             ))}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setPreviewQuestion(q)}
+                            title="Xem thử câu hỏi"
+                          >
+                            <Play className="h-4 w-4 text-blue-500" />
+                          </Button>
                           {canEditQuestion(q) && (
                             <Button
                               variant="ghost"
@@ -502,6 +512,12 @@ export default function QuestionsPage() {
               ? extractError(updateMut.error)
               : null
         }
+      />
+
+      <QuestionPreviewModal
+        open={previewQuestion !== null}
+        onOpenChange={(o) => { if (!o) setPreviewQuestion(null); }}
+        question={previewQuestion}
       />
     </div>
   );
