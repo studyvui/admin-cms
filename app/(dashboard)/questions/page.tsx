@@ -555,6 +555,7 @@ export default function QuestionsPage() {
           if (!o) setEditing(null);
         }}
         editing={editing}
+        courses={courses ?? []}
         lessons={lessons ?? []}
         onSubmit={onSubmit}
         submitting={createMut.isPending || updateMut.isPending}
@@ -580,6 +581,7 @@ function QuestionDialog({
   open,
   onOpenChange,
   editing,
+  courses,
   lessons,
   onSubmit,
   submitting,
@@ -588,11 +590,31 @@ function QuestionDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: Question | null;
-  lessons: { id: string; code: string; name: string; skills: string[] }[];
+  courses: { id: string; code: string; name: string }[];
+  lessons: { id: string; courseId: string; code: string; name: string; skills: string[] }[];
   onSubmit: (values: QuestionFormValues) => void;
   submitting: boolean;
   error: string | null;
 }) {
+  const initialCourseId = useMemo(() => {
+    if (editing) {
+      return lessons.find((l) => l.id === editing.lessonId)?.courseId ?? "";
+    }
+    return courses[0]?.id ?? "";
+  }, [editing, lessons, courses]);
+
+  const [dialogCourseId, setDialogCourseId] = useState(initialCourseId);
+
+  // Sync khi dialog mo lai (editing thay doi)
+  useEffect(() => {
+    setDialogCourseId(initialCourseId);
+  }, [initialCourseId, open]);
+
+  const lessonsInCourse = useMemo(
+    () => lessons.filter((l) => !dialogCourseId || l.courseId === dialogCourseId),
+    [lessons, dialogCourseId],
+  );
+
   const defaults = useMemo<QuestionFormValues>(() => {
     if (editing) {
       const c = editing.content as {
@@ -637,7 +659,7 @@ function QuestionDialog({
     }
     return {
       mode: "mc",
-      lessonId: lessons[0]?.id ?? "",
+      lessonId: lessonsInCourse[0]?.id ?? "",
       code: "",
       type: "multiple_choice",
       skill: "vocab",
@@ -650,7 +672,7 @@ function QuestionDialog({
       optionD: "",
       correctOption: "A",
     };
-  }, [editing, lessons]);
+  }, [editing, lessonsInCourse]);
 
   const {
     register,
@@ -710,7 +732,31 @@ function QuestionDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Khóa học</Label>
+              <Select
+                value={dialogCourseId}
+                onValueChange={(v) => {
+                  setDialogCourseId(v);
+                  // Tự chọn bài học đầu tiên của khóa mới
+                  const firstLesson = lessons.find((l) => l.courseId === v);
+                  setValue("lessonId", firstLesson?.id ?? "", { shouldValidate: true });
+                }}
+                disabled={!!editing}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn khóa học" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.code} — {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Bài học</Label>
               <Select
@@ -724,7 +770,7 @@ function QuestionDialog({
                   <SelectValue placeholder="Chọn bài học" />
                 </SelectTrigger>
                 <SelectContent>
-                  {lessons.map((l) => (
+                  {lessonsInCourse.map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.code} — {l.name}
                     </SelectItem>
