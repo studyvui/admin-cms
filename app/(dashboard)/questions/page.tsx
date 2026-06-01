@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Plus, Pencil, ArrowRight, ImageIcon, Music, X, Trash2, Play } from "lucide-react";
 import { QuestionPreviewModal } from "@/components/question-preview/question-preview-modal";
 import { lessonsApi } from "@/lib/api/lessons";
+import { coursesApi } from "@/lib/api/courses";
 import { ImagePicker } from "@/components/asset-picker/image-picker";
 import { AudioPicker } from "@/components/asset-picker/audio-picker";
 import { questionsApi } from "@/lib/api/questions";
@@ -131,6 +132,7 @@ type QuestionFormValues = z.infer<typeof questionFormSchema>;
 export default function QuestionsPage() {
   const { hasRole, hydrated } = useAuth();
   const queryClient = useQueryClient();
+  const [selectedCourseId, setSelectedCourseId] = useState<string | undefined>(undefined);
   const [filters, setFilters] = useState<{
     lessonId?: string;
     status?: QuestionStatus;
@@ -140,10 +142,26 @@ export default function QuestionsPage() {
   const [editing, setEditing] = useState<Question | null>(null);
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
 
+  const { data: courses } = useQuery({
+    queryKey: ["courses"],
+    queryFn: () => coursesApi.list(),
+  });
+
   const { data: lessons } = useQuery({
     queryKey: ["lessons", "for-questions"],
     queryFn: () => lessonsApi.list(),
   });
+
+  const filteredLessons = useMemo(() => {
+    if (!lessons) return [];
+    if (!selectedCourseId) return lessons;
+    return lessons.filter((l) => l.courseId === selectedCourseId);
+  }, [lessons, selectedCourseId]);
+
+  const lessonIdsInCourse = useMemo(
+    () => new Set(filteredLessons.map((l) => l.id)),
+    [filteredLessons],
+  );
 
   const { data: questions, isLoading, error } = useQuery({
     queryKey: ["questions", filters],
@@ -191,6 +209,12 @@ export default function QuestionsPage() {
     lessons?.forEach((l) => m.set(l.id, `${l.code} — ${l.name}`));
     return m;
   }, [lessons]);
+
+  const displayedQuestions = useMemo(() => {
+    if (!questions) return [];
+    if (!selectedCourseId || filters.lessonId) return questions;
+    return questions.filter((q) => lessonIdsInCourse.has(q.lessonId));
+  }, [questions, selectedCourseId, filters.lessonId, lessonIdsInCourse]);
 
   if (!hydrated) return null;
   if (!hasRole("admin", "editor", "qa")) {
@@ -291,7 +315,36 @@ export default function QuestionsPage() {
           <CardTitle className="text-lg">Bộ lọc</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div>
+              <Label className="mb-1.5 block text-xs">Khóa học</Label>
+              <Select
+                value={selectedCourseId ?? "all"}
+                onValueChange={(v) => {
+                  const newCourseId = v === "all" ? undefined : v;
+                  setSelectedCourseId(newCourseId);
+                  // Reset lesson filter nếu lesson không thuộc course mới
+                  if (filters.lessonId && newCourseId) {
+                    const lesson = lessons?.find((l) => l.id === filters.lessonId);
+                    if (lesson && lesson.courseId !== newCourseId) {
+                      setFilters((f) => ({ ...f, lessonId: undefined }));
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tất cả" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả</SelectItem>
+                  {courses?.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.code} — {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label className="mb-1.5 block text-xs">Bài học</Label>
               <Select
@@ -308,7 +361,7 @@ export default function QuestionsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả</SelectItem>
-                  {lessons?.map((l) => (
+                  {filteredLessons.map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.code} — {l.name}
                     </SelectItem>
@@ -360,7 +413,7 @@ export default function QuestionsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
-            Danh sách ({questions?.length ?? 0})
+            Danh sách ({displayedQuestions.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -374,7 +427,7 @@ export default function QuestionsPage() {
             <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               {extractError(error)}
             </div>
-          ) : !questions || questions.length === 0 ? (
+          ) : displayedQuestions.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Không có câu hỏi khớp bộ lọc.
             </p>
@@ -393,7 +446,7 @@ export default function QuestionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {questions.map((q) => {
+                {displayedQuestions.map((q) => {
                   const allNextStatuses = STATUS_FLOW[q.status] ?? [];
                   // Editor: chi cho phep draft→review va review→draft
                   const nextStatuses = isEditor
