@@ -637,7 +637,6 @@ function LessonDialog({
   }, [isEnglishCourse]);
 
   return (
-    <>
     <Dialog
       open={open}
       onOpenChange={(o) => {
@@ -866,6 +865,20 @@ function LessonDialog({
             </div>
           )}
 
+          {/* Asset pickers — inside form so Radix UI handles focus correctly */}
+          <ImagePicker
+            open={pickerState?.type === "image"}
+            onOpenChange={(o) => { if (!o) setPickerState(null); }}
+            multiple={false}
+            onConfirm={handlePickerConfirm}
+          />
+          <AudioPicker
+            open={pickerState?.type === "audio"}
+            onOpenChange={(o) => { if (!o) setPickerState(null); }}
+            multiple={false}
+            onConfirm={handlePickerConfirm}
+          />
+
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
@@ -886,19 +899,6 @@ function LessonDialog({
         </form>
       </DialogContent>
     </Dialog>
-    <ImagePicker
-      open={pickerState?.type === "image"}
-      onOpenChange={(o) => { if (!o) setPickerState(null); }}
-      multiple={false}
-      onConfirm={handlePickerConfirm}
-    />
-    <AudioPicker
-      open={pickerState?.type === "audio"}
-      onOpenChange={(o) => { if (!o) setPickerState(null); }}
-      multiple={false}
-      onConfirm={handlePickerConfirm}
-    />
-    </>
   );
 }
 
