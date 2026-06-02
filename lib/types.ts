@@ -68,6 +68,7 @@ export interface UpdateCourseInput {
 
 export interface VocabItem {
   word: string;
+  meaning?: string;
   imageUrl?: string;
   audioUrl?: string;
 }

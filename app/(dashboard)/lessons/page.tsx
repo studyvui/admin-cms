@@ -136,6 +136,7 @@ const EMPTY_KEYS: string[] = [];
 
 const vocabItemSchema = z.object({
   word: z.string().min(1, "Bắt buộc"),
+  meaning: z.string().optional(),
   imageUrl: z.string().optional(),
   audioUrl: z.string().optional(),
 });
@@ -801,7 +802,7 @@ function LessonDialog({
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    appendVocab({ word: "", imageUrl: "", audioUrl: "" })
+                    appendVocab({ word: "", meaning: "", imageUrl: "", audioUrl: "" })
                   }
                 >
                   <Plus className="mr-1 h-3 w-3" />
@@ -815,8 +816,9 @@ function LessonDialog({
                 </p>
               ) : (
                 <div className="space-y-1.5">
-                  <div className="grid grid-cols-[1fr_2fr_2fr_2rem] gap-1.5 px-0.5">
+                  <div className="grid grid-cols-[1fr_1fr_2fr_2fr_2rem] gap-1.5 px-0.5">
                     <span className="text-xs text-muted-foreground">Từ vựng</span>
+                    <span className="text-xs text-muted-foreground">Nghĩa (Tiếng Việt)</span>
                     <span className="text-xs text-muted-foreground">Hình ảnh</span>
                     <span className="text-xs text-muted-foreground">Âm thanh</span>
                     <span />
@@ -825,11 +827,16 @@ function LessonDialog({
                     {vocabFields.map((field, index) => (
                       <div
                         key={field.id}
-                        className="grid grid-cols-[1fr_2fr_2fr_2rem] gap-1.5 items-center"
+                        className="grid grid-cols-[1fr_1fr_2fr_2fr_2rem] gap-1.5 items-center"
                       >
                         <Input
                           placeholder="apple"
                           {...register(`vocabulary.${index}.word`)}
+                          className="h-8 text-sm"
+                        />
+                        <Input
+                          placeholder="quả táo"
+                          {...register(`vocabulary.${index}.meaning`)}
                           className="h-8 text-sm"
                         />
                         <VocabAssetField
