@@ -63,7 +63,7 @@ export const BUILTIN_GROUPS: Record<string, MathTemplate[]> = {
     declarative(
       "TPL_COUNT_01",
       "counting",
-      "Đếm số",
+      "counting",
       "Có bao nhiêu {item} trong hình?",
       "count",
       [num("count", 1, 5), text("item", ["quả táo", "con mèo", "chiếc xe", "ngôi sao"])],
@@ -73,7 +73,7 @@ export const BUILTIN_GROUPS: Record<string, MathTemplate[]> = {
     declarative(
       "TPL_ADD_01",
       "calculation",
-      "Phép cộng",
+      "addition",
       "Tính: {a} + {b} = ?",
       "a + b",
       [num("a", 1, 10), num("b", 1, 10)],
@@ -81,7 +81,7 @@ export const BUILTIN_GROUPS: Record<string, MathTemplate[]> = {
     declarative(
       "TPL_ADD_WORD_01",
       "word_problem",
-      "Toán có lời văn",
+      "word_problem",
       "Lan có {a} {item}. Mẹ cho Lan thêm {b} {item} nữa. Hỏi Lan có tất cả bao nhiêu {item}?",
       "a + b",
       [num("a", 1, 10), num("b", 1, 10), text("item", ["quyển vở", "cái kẹo", "quả cam", "viên bi"])],
@@ -91,7 +91,7 @@ export const BUILTIN_GROUPS: Record<string, MathTemplate[]> = {
     declarative(
       "TPL_COMP_01",
       "comparison",
-      "So sánh",
+      "comparison",
       "Điền dấu thích hợp: {a} ... {b}",
       "comparison",
       [num("a", 0, 20), num("b", 0, 20)],
@@ -102,7 +102,7 @@ export const BUILTIN_GROUPS: Record<string, MathTemplate[]> = {
       id: "TPL_SEQ_01",
       source: "builtin",
       lessonType: "sequence",
-      skill: "Dãy số",
+      skill: "sequence",
       grade: 1,
       text: "Điền số tiếp theo vào chỗ chấm: {seq} ...",
       formula: "built-in",
