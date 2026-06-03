@@ -37,7 +37,7 @@ const NAV: NavItem[] = [
   { href: "/bulk-import", label: "Import Excel", icon: Upload, roles: ["admin", "editor"] },
   { href: "/qa/queue", label: "QA Queue", icon: ShieldCheck, roles: ["admin", "qa"] },
   { href: "/qa/audit", label: "Audit Log", icon: History, roles: ["admin", "qa"] },
-  { href: "/ai-generate", label: "AI Generate", icon: Sparkles, roles: ["admin", "editor"] },
+  { href: "/ai-generate", label: "AI Sinh đề Tiếng Anh", icon: Sparkles, roles: ["admin", "editor"] },
   { href: "/settings", label: "Cài đặt", icon: Settings, roles: ["admin"] },
 ];
 
