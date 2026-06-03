@@ -1,21 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import {
-  Sparkles,
-  Wand2,
-  Construction,
-  ExternalLink,
-  Loader2,
-} from "lucide-react";
-import { lessonsApi } from "@/lib/api/lessons";
+import { useMemo, useState } from "react";
+import { Sparkles, Wand2, Loader2, Download, Info, Play } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -23,83 +14,152 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { generateEnglishQuestionsWithProgress } from "@/lib/eng-gen/master-generator";
+import { toBulkRows, downloadBulkXlsx } from "@/lib/eng-gen/export-xlsx";
+import { generatedToQuestion } from "@/lib/eng-gen/to-question";
+import { QuestionPreviewModal } from "@/components/question-preview/question-preview-modal";
+import type { Question } from "@/lib/types";
+import type { GeneratedQuestion, GenReport, Skill, BlueprintType } from "@/lib/eng-gen/types";
 
-const QUESTION_TYPES = [
-  { value: "multiple_choice", label: "Trắc nghiệm" },
-  { value: "image_choice", label: "Chọn ảnh" },
-  { value: "audio_choice", label: "Chọn audio" },
-  { value: "missing_letter", label: "Điền chữ thiếu" },
-  { value: "fill_blank", label: "Điền chỗ trống" },
-  { value: "matching", label: "Nối cặp" },
-  { value: "reorder", label: "Sắp xếp" },
-  { value: "count_objects", label: "Đếm đồ vật" },
-];
-
-const SKILLS = [
-  { value: "vocab", label: "Tu vung" },
+const SKILLS: { value: Skill; label: string }[] = [
+  { value: "vocabulary", label: "Từ vựng" },
   { value: "phonics", label: "Phonics" },
+  { value: "sentence", label: "Câu (sắp xếp)" },
   { value: "listening", label: "Nghe" },
-  { value: "grammar", label: "Ngu phap" },
-  { value: "counting", label: "Dem" },
-  { value: "addition", label: "Cong" },
-  { value: "subtraction", label: "Tru" },
+  { value: "review", label: "Ôn tập" },
 ];
+
+const BLUEPRINTS_BY_SKILL: Record<Skill, { value: BlueprintType; label: string }[]> = {
+  vocabulary: [
+    { value: "image_choice", label: "🖼️ Nhìn hình chọn từ" },
+    { value: "audio_choice", label: "🔊 Nghe chọn từ" },
+    { value: "match_word", label: "🔗 Nối từ" },
+  ],
+  phonics: [{ value: "missing_letter", label: "✏️ Điền chữ thiếu" }],
+  sentence: [{ value: "reorder", label: "🔀 Sắp xếp câu" }],
+  listening: [{ value: "audio_choice", label: "🔊 Nghe chọn đáp án" }],
+  review: [
+    { value: "image_choice", label: "🖼️ Ôn qua hình" },
+    { value: "audio_choice", label: "🔊 Ôn qua âm thanh" },
+  ],
+};
+
+const EXPORTABLE = new Set(["image_choice", "audio_choice", "missing_letter", "multiple_choice"]);
+const DIFF_COLOR: Record<number, string> = { 1: "#10b981", 2: "#f59e0b", 3: "#ef4444" };
 
 export default function AiGeneratePage() {
-  const [lessonId, setLessonId] = useState("");
-  const [type, setType] = useState("multiple_choice");
-  const [skill, setSkill] = useState("vocab");
-  const [count, setCount] = useState(5);
-  const [difficulty, setDifficulty] = useState(1);
-  const [contextNote, setContextNote] = useState("");
+  const [grade] = useState(1);
+  const [week, setWeek] = useState(1);
+  const [skill, setSkill] = useState<Skill>("vocabulary");
+  const [blueprint, setBlueprint] = useState<BlueprintType>("image_choice");
+  const [count, setCount] = useState(10);
+  const [dMin, setDMin] = useState(1);
+  const [dMax, setDMax] = useState(2);
+  const [startSeq, setStartSeq] = useState(101);
 
-  const lessonsQuery = useQuery({
-    queryKey: ["lessons", "ai-generate"],
-    queryFn: () => lessonsApi.list({}),
-  });
+  const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [questions, setQuestions] = useState<GeneratedQuestion[]>([]);
+  const [report, setReport] = useState<GenReport | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [previewQ, setPreviewQ] = useState<Question | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const blueprintOptions = BLUEPRINTS_BY_SKILL[skill];
+
+  const selectedQuestions = useMemo(
+    () => questions.filter((_, i) => selected.has(i)),
+    [questions, selected],
+  );
+  const exportableCount = useMemo(
+    () => selectedQuestions.filter((q) => EXPORTABLE.has(q.blueprintType)).length,
+    [selectedQuestions],
+  );
+
+  function onSkillChange(v: string) {
+    const s = v as Skill;
+    setSkill(s);
+    const first = BLUEPRINTS_BY_SKILL[s][0].value;
+    setBlueprint(first);
+  }
+
+  async function runGenerate() {
+    setGenerating(true);
+    setProgress(0);
+    setQuestions([]);
+    setReport(null);
+    setSelected(new Set());
+    try {
+      const range: [number, number] = [Math.min(dMin, dMax), Math.max(dMin, dMax)];
+      const { questions: qs, report: rpt } = await generateEnglishQuestionsWithProgress(
+        {
+          grade,
+          week,
+          skill,
+          blueprintType: blueprint,
+          count,
+          difficultyRange: range,
+          options: { useAIWording: false, seed: Date.now(), wordList: [] },
+        },
+        (current, total) => setProgress(Math.round((current / total) * 100)),
+      );
+      setQuestions(qs);
+      setReport(rpt);
+      setSelected(new Set(qs.map((_, i) => i)));
+      setProgress(100);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[ai-generate]", e);
+      alert("Sinh đề lỗi: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function toggle(i: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  }
+
+  function openPreview(q: GeneratedQuestion) {
+    setPreviewQ(generatedToQuestion(q));
+    setPreviewOpen(true);
+  }
+
+  function exportXlsx() {
+    const { rows, skipped } = toBulkRows(selectedQuestions, { grade, week, startSeq });
+    if (rows.length === 0) {
+      alert(
+        "Không có câu nào xuất được. Chỉ image_choice / audio_choice / missing_letter khớp định dạng 12 cột.",
+      );
+      return;
+    }
+    const ww = String(week).padStart(2, "0");
+    downloadBulkXlsx(rows, `SinhDe_G${grade}_W${ww}_ENG.xlsx`);
+    if (skipped.length > 0) {
+      alert(`Đã xuất ${rows.length} câu. Bỏ qua ${skipped.length} câu không khớp định dạng 12 cột.`);
+    }
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <Sparkles className="h-6 w-6" />
-          AI Generate
+          AI Sinh đề Tiếng Anh
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sinh câu hỏi tự động bằng Claude API — chọn bài học, loại câu, độ khó.
+          Sinh câu hỏi tại chỗ (template + asset auto-map) — <strong>0 token</strong>. Xem trước → chọn
+          → Xuất Excel 12 cột → nạp qua Bulk Import → QA publish.
         </p>
       </div>
 
-      <Card className="border-amber-300 bg-amber-50">
-        <CardContent className="flex items-start gap-3 py-4">
-          <Construction className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-          <div className="text-sm text-amber-900">
-            <div className="font-semibold">
-              Tính năng đang chờ Backend GD10 (AI & Scale Infrastructure)
-            </div>
-            <p className="mt-1">
-              UI form bên dưới đã hoàn thiện — chỉ cần backend mở endpoint{" "}
-              <code className="rounded bg-amber-100 px-1 font-mono text-xs">
-                POST /admin/ai/generate
-              </code>{" "}
-              thì nút <em>Sinh câu hỏi</em> sẽ tự kích hoạt. Hiện tại pipeline
-              sinh đề thủ công vẫn dùng tab <strong>Import Excel</strong> hoặc
-              nhập tay ở trang <strong>Câu hỏi</strong>.
-            </p>
-            <a
-              href="https://github.com/studyvui/backend/issues?q=GD10"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber-800 hover:underline"
-            >
-              <ExternalLink className="h-3 w-3" />
-              Tiến độ GD10
-            </a>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4 lg:grid-cols-2">
+        {/* Cấu hình */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -108,54 +168,28 @@ export default function AiGeneratePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label className="text-xs">Bài học đích</Label>
-              <Select value={lessonId} onValueChange={setLessonId}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue
-                    placeholder={
-                      lessonsQuery.isLoading
-                        ? "Đang tải..."
-                        : "Chọn bài học"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {(lessonsQuery.data ?? []).map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.code} — {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {lessonsQuery.isLoading && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
-                  Đang tải danh sách bài học...
-                </p>
-              )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Lớp</Label>
+                <Input value={grade} disabled className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Tuần (1-35)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={35}
+                  value={week}
+                  onChange={(e) => setWeek(Math.min(35, Math.max(1, Number(e.target.value))))}
+                  className="mt-1"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Loại câu hỏi</Label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {QUESTION_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
                 <Label className="text-xs">Kỹ năng</Label>
-                <Select value={skill} onValueChange={setSkill}>
+                <Select value={skill} onValueChange={onSkillChange}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
@@ -168,115 +202,179 @@ export default function AiGeneratePage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label className="text-xs">Loại câu</Label>
+                <Select value={blueprint} onValueChange={(v) => setBlueprint(v as BlueprintType)}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {blueprintOptions.map((b) => (
+                      <SelectItem key={b.value} value={b.value}>
+                        {b.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label className="text-xs">Số lượng (1-50)</Label>
+                <Label className="text-xs">Số câu (1-50)</Label>
                 <Input
                   type="number"
                   min={1}
                   max={50}
                   value={count}
-                  onChange={(e) => setCount(Number(e.target.value))}
+                  onChange={(e) => setCount(Math.min(50, Math.max(1, Number(e.target.value))))}
                   className="mt-1"
                 />
               </div>
-
               <div>
-                <Label className="text-xs">Độ khó (1-5)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(Number(e.target.value))}
-                  className="mt-1"
-                />
+                <Label className="text-xs">Độ khó từ</Label>
+                <Input type="number" min={1} max={3} value={dMin} onChange={(e) => setDMin(Number(e.target.value))} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Đến</Label>
+                <Input type="number" min={1} max={3} value={dMax} onChange={(e) => setDMax(Number(e.target.value))} className="mt-1" />
               </div>
             </div>
 
             <div>
-              <Label className="text-xs">
-                Ghi chú ngữ cảnh (tuỳ chọn)
-              </Label>
-              <Textarea
-                value={contextNote}
-                onChange={(e) => setContextNote(e.target.value)}
-                placeholder="Ví dụ: tránh từ vựng trùng các bài trước, ưu tiên động vật quen thuộc với trẻ em VN..."
-                className="mt-1 min-h-[80px]"
-              />
+              <Label className="text-xs">Mã câu bắt đầu (seq)</Label>
+              <Input type="number" min={1} value={startSeq} onChange={(e) => setStartSeq(Number(e.target.value))} className="mt-1" />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Mặc định 101 để tránh đè câu seed cũ. Mã: G{grade}_W{String(week).padStart(2, "0")}_ENG_{String(startSeq).padStart(3, "0")}…
+              </p>
             </div>
 
-            <Button
-              disabled
-              className="w-full"
-              title="Chờ backend GD10 mở /admin/ai/generate"
-            >
-              <Wand2 className="mr-2 h-4 w-4" />
-              Sinh {count} câu hỏi (chờ GD10)
+            <Button className="w-full" onClick={runGenerate} disabled={generating}>
+              {generating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang sinh… {progress}%
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Generate — Sinh {count} câu
+                </>
+              )}
             </Button>
+
+            {report && (
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="rounded-md border p-2">
+                  <div className="text-lg font-bold text-emerald-600">{report.generated}</div>
+                  <div className="text-muted-foreground">Đã sinh</div>
+                </div>
+                <div className="rounded-md border p-2">
+                  <div className="text-lg font-bold text-amber-600">{report.duplicates}</div>
+                  <div className="text-muted-foreground">Trùng</div>
+                </div>
+                <div className="rounded-md border p-2">
+                  <div className="text-lg font-bold text-red-600">{report.qa_failed}</div>
+                  <div className="text-muted-foreground">QA loại</div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
+        {/* Preview */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Kết quả xem trước</CardTitle>
+            <CardTitle className="flex items-center justify-between text-base">
+              <span>Xem trước ({selected.size}/{questions.length} chọn)</span>
+              <Button size="sm" variant="outline" onClick={exportXlsx} disabled={exportableCount === 0}>
+                <Download className="mr-1 h-4 w-4" />
+                Xuất Excel 12 cột
+              </Button>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 rounded-md border border-dashed text-center">
-              <Sparkles className="h-10 w-10 text-muted-foreground/40" />
-              <div>
-                <div className="text-sm font-medium">Chưa có kết quả</div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Sau khi backend GD10 sẵn sàng, câu hỏi sinh ra sẽ hiện ở đây
-                  trước khi anh chọn lưu vào DB (status = <em>draft</em>).
-                </p>
+            {questions.length === 0 ? (
+              <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 rounded-md border border-dashed text-center">
+                <Sparkles className="h-10 w-10 text-muted-foreground/40" />
+                <p className="text-xs text-muted-foreground">Bấm Generate để sinh câu hỏi (0 token).</p>
               </div>
-            </div>
+            ) : (
+              <div className="max-h-[460px] space-y-2 overflow-y-auto pr-1">
+                {questions.map((q, i) => {
+                  const exportable = EXPORTABLE.has(q.blueprintType);
+                  return (
+                    <div key={q.id} className="flex items-start gap-2 rounded-md border p-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(i)}
+                        onChange={() => toggle(i)}
+                        className="mt-1 h-4 w-4"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-1">
+                          <Badge variant="secondary" className="text-[10px]">{q.skill}</Badge>
+                          <Badge variant="secondary" className="text-[10px]">{q.blueprintType}</Badge>
+                          <span
+                            className="rounded px-1.5 text-[10px] font-bold"
+                            style={{ color: DIFF_COLOR[q.difficulty] || "#64748b" }}
+                          >
+                            L{q.difficulty}
+                          </span>
+                          {!exportable && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600">
+                              không xuất 12 cột
+                            </Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="ml-auto h-6 gap-1 px-2 text-[11px]"
+                            onClick={() => openPreview(q)}
+                          >
+                            <Play className="h-3 w-3" />
+                            Xem thử
+                          </Button>
+                        </div>
+                        <div className="text-[13px]">
+                          <span className="font-medium text-muted-foreground">{i + 1}.</span> {q.components.stem}
+                        </div>
+                        <div className="text-[12px] font-semibold text-emerald-600">✓ {q.correct_answer}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Nhiễu: {q.components.distractors.slice(0, 3).join(", ") || "(—)"}
+                        </div>
+                        {q.components.assets.image && q.blueprintType === "image_choice" && (
+                          <div className="truncate text-[10px] text-violet-500">🖼 {q.components.assets.image}</div>
+                        )}
+                        {q.components.assets.audio && q.blueprintType === "audio_choice" && (
+                          <div className="truncate text-[10px] text-sky-500">🔊 {q.components.assets.audio}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Lộ trình tích hợp</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol className="space-y-2 text-sm">
-            <li className="flex items-start gap-2">
-              <Badge variant="outline" className="mt-0.5">
-                1
-              </Badge>
-              Backend GD10 mở endpoint{" "}
-              <code className="rounded bg-muted px-1 font-mono text-xs">
-                POST /admin/ai/generate
-              </code>{" "}
-              nhận payload {`{ lessonId, type, skill, count, difficulty, context }`}
-            </li>
-            <li className="flex items-start gap-2">
-              <Badge variant="outline" className="mt-0.5">
-                2
-              </Badge>
-              Backend gọi Claude API → validate → trả về danh sách câu hỏi (chưa
-              lưu DB)
-            </li>
-            <li className="flex items-start gap-2">
-              <Badge variant="outline" className="mt-0.5">
-                3
-              </Badge>
-              UI hiện preview, cho admin chọn câu nào lưu, câu nào bỏ
-            </li>
-            <li className="flex items-start gap-2">
-              <Badge variant="outline" className="mt-0.5">
-                4
-              </Badge>
-              Bấm <em>Lưu</em> → batch insert vào DB với status <em>draft</em>{" "}
-              → qua QA Queue như câu thường
-            </li>
-          </ol>
+      <Card className="border-sky-200 bg-sky-50">
+        <CardContent className="flex items-start gap-3 py-4 text-sm text-sky-900">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
+          <div>
+            <div className="font-semibold">Quy trình</div>
+            <p className="mt-1">
+              Generate → chọn câu → <strong>Xuất Excel 12 cột</strong> → trang <strong>Bulk Import</strong> →
+              Import (draft) → <strong>QA Queue</strong> duyệt → publish → học sinh thấy trên studyvui.vn.
+              Loại <code className="rounded bg-sky-100 px-1">reorder</code>/
+              <code className="rounded bg-sky-100 px-1">match_word</code> chưa xuất 12 cột (làm đợt sau).
+            </p>
+          </div>
         </CardContent>
       </Card>
+
+      <QuestionPreviewModal open={previewOpen} onOpenChange={setPreviewOpen} question={previewQ} />
     </div>
   );
 }
