@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,29 +21,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { generateOne } from "@/lib/math-gen/generate";
+import { SKILL_LABELS, skillLabel, lessonTypeLabel } from "@/lib/math-gen/labels";
 import type { MathTemplate, ServerTemplate, TemplateInput, TemplateVar, VarType } from "@/lib/math-gen/types";
 
 const VAR_NAMES = ["a", "b", "c", "d"];
-
-// Kỹ năng (tiếng Việt) — lưu thẳng nhãn tiếng Việt vào câu hỏi.
-export const MATH_SKILLS = [
-  "Đếm số",
-  "Phép cộng",
-  "Phép trừ",
-  "Phép nhân",
-  "Phép chia",
-  "So sánh",
-  "Dãy số",
-  "Tách gộp số",
-  "Tính nhẩm",
-  "Nhận biết quy luật",
-  "Tư duy logic",
-  "Toán có lời văn",
-  "Điền số còn thiếu",
-  "Hình phẳng",
-  "Hình khối",
-  "Tư duy không gian",
-];
 
 interface VarRow {
   name: string;
@@ -60,6 +41,8 @@ interface Props {
   editing: ServerTemplate | null;
   /** Prefill khi sao chép built-in thành mẫu mới (không có id → tạo mới). */
   initial?: TemplateInput | null;
+  /** Kỹ năng cho phép (lấy từ bài học của tuần). Rỗng → cho mọi kỹ năng. */
+  allowedSkills?: string[];
   saving: boolean;
   onSubmit: (input: TemplateInput, id?: string) => void;
 }
@@ -88,11 +71,16 @@ function rowsToVars(rows: VarRow[]): TemplateVar[] {
   );
 }
 
-export function TemplateEditorModal({ open, onOpenChange, lessonType, editing, initial, saving, onSubmit }: Props) {
+export function TemplateEditorModal({ open, onOpenChange, lessonType, editing, initial, allowedSkills, saving, onSubmit }: Props) {
+  const skillOptions = useMemo(
+    () => (allowedSkills && allowedSkills.length > 0 ? allowedSkills : Object.keys(SKILL_LABELS)),
+    [allowedSkills],
+  );
+
   const [text, setText] = useState("");
   const [formula, setFormula] = useState("");
   const [condition, setCondition] = useState("");
-  const [skill, setSkill] = useState("Phép cộng");
+  const [skill, setSkill] = useState(skillOptions[0]);
   const [distractorCount, setDistractorCount] = useState(3);
   const [rows, setRows] = useState<VarRow[]>(toVarRows([]));
   const [preview, setPreview] = useState<{ text: string; options: string[]; answer: string } | null>(null);
@@ -101,24 +89,26 @@ export function TemplateEditorModal({ open, onOpenChange, lessonType, editing, i
   useEffect(() => {
     if (!open) return;
     const seed = editing ?? initial;
+    const fallbackSkill = skillOptions[0];
     if (seed) {
       setText(seed.text);
       setFormula(seed.formula);
       setCondition((editing?.condition ?? initial?.condition ?? "") || "");
-      setSkill(seed.skill);
+      // chỉ giữ skill nếu nằm trong danh sách cho phép của bài học
+      setSkill(skillOptions.includes(seed.skill) ? seed.skill : fallbackSkill);
       setDistractorCount(seed.distractorCount || 3);
       setRows(toVarRows(seed.vars));
     } else {
       setText("");
       setFormula("");
       setCondition("");
-      setSkill("Phép cộng");
+      setSkill(fallbackSkill);
       setDistractorCount(3);
       setRows(toVarRows([]));
     }
     setPreview(null);
     setError(null);
-  }, [open, editing, initial]);
+  }, [open, editing, initial, skillOptions]);
 
   const addRow = () => {
     if (rows.length >= 4) return;
@@ -167,7 +157,7 @@ export function TemplateEditorModal({ open, onOpenChange, lessonType, editing, i
         <DialogHeader>
           <DialogTitle>{editing ? "Sửa template" : initial ? "Sao chép mẫu (tạo bản mới)" : "Thêm template"}</DialogTitle>
           <DialogDescription>
-            Lesson type: <strong>{lessonType}</strong> · dùng {"{a}{b}{c}{d}"} cho biến.
+            Loại bài học: <strong>{lessonTypeLabel(lessonType)}</strong> · dùng {"{a}{b}{c}{d}"} cho biến.
             {!editing && initial ? " · Đang sao chép từ mẫu built-in — lưu sẽ tạo bản custom mới." : ""}
           </DialogDescription>
         </DialogHeader>
@@ -188,8 +178,8 @@ export function TemplateEditorModal({ open, onOpenChange, lessonType, editing, i
               <Select value={skill} onValueChange={setSkill}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {MATH_SKILLS.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  {skillOptions.map((s) => (
+                    <SelectItem key={s} value={s}>{skillLabel(s)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

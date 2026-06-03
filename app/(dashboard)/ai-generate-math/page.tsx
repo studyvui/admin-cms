@@ -13,29 +13,25 @@ import {
   Pencil,
   Trash2,
   Settings2,
+  BookOpen,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { extractError } from "@/lib/errors";
 import { questionTemplatesApi } from "@/lib/api/question-templates";
-import {
-  getBuiltinsForLessonType,
-} from "@/lib/math-gen/builtins";
+import { lessonsApi } from "@/lib/api/lessons";
+import { getBuiltinsForLessonType } from "@/lib/math-gen/builtins";
 import { generateBatch } from "@/lib/math-gen/generate";
 import { toBulkRows, downloadBulkXlsx } from "@/lib/math-gen/export-xlsx";
+import { lessonTypeLabel, skillLabel } from "@/lib/math-gen/labels";
 import { TemplateEditorModal } from "@/components/math-template/template-editor-modal";
 import { MathPreviewEditModal } from "@/components/question-preview/math-preview-edit-modal";
+import type { Lesson } from "@/lib/types";
 import type {
   GeneratedMathQuestion,
   MathGenReport,
@@ -43,23 +39,6 @@ import type {
   ServerTemplate,
   TemplateInput,
 } from "@/lib/math-gen/types";
-
-const LESSON_TYPES: { value: string; label: string }[] = [
-  { value: "counting", label: "Đếm số (Counting)" },
-  { value: "comparison", label: "So sánh dấu > < = (Comparison)" },
-  { value: "compare_quantity", label: "So sánh số lượng (Compare Quantity)" },
-  { value: "sequence", label: "Dãy số quy luật (Sequence)" },
-  { value: "sort_numbers", label: "Sắp xếp dãy số (Sort Numbers)" },
-  { value: "number_decompose", label: "Tách gộp số (Decompose)" },
-  { value: "write_equation", label: "Nhìn hình viết phép tính" },
-  { value: "complete_table", label: "Hoàn thành bảng (Complete Table)" },
-  { value: "chain_calculation", label: "Chuỗi phép tính (Chain Calc)" },
-  { value: "find_missing_number", label: "Tìm số ẩn (Find Missing)" },
-  { value: "calculation", label: "Tính kết quả (Calculation)" },
-  { value: "fill_blank", label: "Điền số còn thiếu (Fill Blank)" },
-  { value: "word_problem", label: "Toán có lời văn (Word Problem)" },
-  { value: "classify_2d", label: "Phân loại hình phẳng (2D)" },
-];
 
 const DIFF_COLOR: Record<number, string> = { 1: "#10b981", 2: "#f59e0b", 3: "#ef4444" };
 
@@ -72,6 +51,7 @@ function serverToTemplate(s: ServerTemplate): MathTemplate {
     grade: s.grade,
     text: s.text,
     formula: s.formula,
+    condition: s.condition ?? undefined,
     vars: s.vars || [],
     distractorCount: s.distractorCount || 3,
   };
@@ -81,7 +61,6 @@ export default function AiGenerateMathPage() {
   const qc = useQueryClient();
   const [grade] = useState(1);
   const [week, setWeek] = useState(1);
-  const [lessonType, setLessonType] = useState("calculation");
   const [count, setCount] = useState(10);
   const [startSeq, setStartSeq] = useState(101);
 
@@ -97,11 +76,34 @@ export default function AiGenerateMathPage() {
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  // Templates: built-in + user (backend)
-  const builtins = useMemo(() => getBuiltinsForLessonType(lessonType), [lessonType]);
+  // ── Bài học Toán theo tuần (nguồn dẫn dắt lessonType + skills) ──
+  const { data: allLessons = [] } = useQuery({
+    queryKey: ["lessons", "all"],
+    queryFn: () => lessonsApi.list({}),
+  });
+  const mathLessonByWeek = useMemo(() => {
+    const m = new Map<number, Lesson>();
+    const re = new RegExp(`^G${grade}_W(\\d+)_MATH$`);
+    for (const l of allLessons) {
+      const mt = re.exec(l.code);
+      if (mt && !m.has(l.week)) m.set(l.week, l);
+    }
+    return m;
+  }, [allLessons, grade]);
+
+  const currentLesson = mathLessonByWeek.get(week) ?? null;
+  const lessonType = currentLesson?.lessonType ?? "";
+  const allowedSkills = currentLesson?.skills ?? [];
+
+  // ── Templates: built-in + user (backend), lọc theo lessonType của tuần ──
+  const builtins = useMemo(
+    () => (lessonType ? getBuiltinsForLessonType(lessonType) : []),
+    [lessonType],
+  );
   const { data: userTemplates = [], isLoading } = useQuery({
     queryKey: ["question-templates", lessonType],
     queryFn: () => questionTemplatesApi.list({ lessonType }),
+    enabled: !!lessonType,
   });
   const allTemplates: MathTemplate[] = useMemo(
     () => [...builtins, ...userTemplates.map(serverToTemplate)],
@@ -133,8 +135,8 @@ export default function AiGenerateMathPage() {
     [selectedQuestions],
   );
 
-  function onLessonTypeChange(v: string) {
-    setLessonType(v);
+  function onWeekChange(v: number) {
+    setWeek(Math.min(35, Math.max(1, v)));
     setSelectedTplId(null);
   }
 
@@ -177,9 +179,7 @@ export default function AiGenerateMathPage() {
 
   function saveAssetRefs(refs: string[]) {
     if (previewIdx == null) return;
-    setQuestions((prev) =>
-      prev.map((q, i) => (i === previewIdx ? { ...q, assetRefs: refs } : q)),
-    );
+    setQuestions((prev) => prev.map((q, i) => (i === previewIdx ? { ...q, assetRefs: refs } : q)));
   }
 
   function exportXlsx() {
@@ -196,25 +196,18 @@ export default function AiGenerateMathPage() {
   }
 
   function onSubmitTemplate(input: TemplateInput, id?: string) {
-    if (id) {
-      updateMut.mutate(
-        { id, input },
-        { onSuccess: () => setEditorOpen(false), onError: (e) => alert(extractError(e)) },
-      );
-    } else {
-      createMut.mutate(input, {
-        onSuccess: () => setEditorOpen(false),
-        onError: (e) => alert(extractError(e)),
-      });
-    }
+    const opts = {
+      onSuccess: () => setEditorOpen(false),
+      onError: (e: unknown) => alert(extractError(e)),
+    };
+    if (id) updateMut.mutate({ id, input }, opts);
+    else createMut.mutate(input, opts);
   }
 
   function handleDelete(id: string) {
     if (!confirm("Xoá template này?")) return;
     deleteMut.mutate(id, { onError: (e) => alert(extractError(e)) });
   }
-
-  const previewQuestion = previewIdx != null ? questions[previewIdx] : null;
 
   function openAddTemplate() {
     setEditing(null);
@@ -241,6 +234,8 @@ export default function AiGenerateMathPage() {
     setEditorOpen(true);
   }
 
+  const previewQuestion = previewIdx != null ? questions[previewIdx] : null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -249,12 +244,57 @@ export default function AiGenerateMathPage() {
           AI Sinh đề Toán
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ngân hàng mẫu (template + biến min–max / danh sách chữ). Sinh tại chỗ <strong>0 token</strong> →
-          xem trước &amp; gắn ảnh/audio → Xuất Excel 12 cột → Bulk Import → QA publish.
+          Chọn tuần → bám theo bài học của tuần đó. Ngân hàng mẫu (biến min–max / danh sách chữ + điều kiện),
+          sinh tại chỗ <strong>0 token</strong> → xem trước &amp; gắn ảnh/audio → Xuất Excel 12 cột.
         </p>
       </div>
 
-      {/* Lesson type + manager */}
+      {/* Chọn bài học theo tuần */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BookOpen className="h-4 w-4" />
+            Bài học theo tuần
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:max-w-sm">
+            <div>
+              <Label className="text-xs">Lớp</Label>
+              <Input value={grade} disabled className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Tuần (1-35)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={35}
+                value={week}
+                onChange={(e) => onWeekChange(Number(e.target.value))}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          {currentLesson ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+              <span className="font-mono text-xs text-muted-foreground">{currentLesson.code}</span>
+              <span className="font-semibold">{currentLesson.name}</span>
+              <Badge variant="secondary">{lessonTypeLabel(currentLesson.lessonType)}</Badge>
+              <span className="text-xs text-muted-foreground">Kỹ năng:</span>
+              {allowedSkills.map((s) => (
+                <Badge key={s} variant="outline" className="text-[10px]">{skillLabel(s)}</Badge>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              Tuần {week} chưa có bài học Toán (<span className="font-mono">G{grade}_W{String(week).padStart(2, "0")}_MATH</span>).
+              Tạo bài học ở trang <strong>Bài học</strong> trước.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* (A) Template manager */}
         <Card>
@@ -263,82 +303,79 @@ export default function AiGenerateMathPage() {
               <span className="flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />
                 Ngân hàng mẫu
+                {lessonType && <Badge variant="secondary">{lessonTypeLabel(lessonType)}</Badge>}
               </span>
-              <Button size="sm" onClick={openAddTemplate}>
+              <Button size="sm" onClick={openAddTemplate} disabled={!lessonType}>
                 <Plus className="mr-1 h-4 w-4" /> Thêm mẫu
               </Button>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <Label className="text-xs">Lesson type</Label>
-              <Select value={lessonType} onValueChange={onLessonTypeChange}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {LESSON_TYPES.map((lt) => (
-                    <SelectItem key={lt.value} value={lt.value}>{lt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
-              {isLoading && <p className="text-xs text-muted-foreground">Đang tải mẫu…</p>}
-              {allTemplates.length === 0 && !isLoading && (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                  Chưa có mẫu cho lesson type này. Bấm “Thêm mẫu”.
-                </p>
-              )}
-              {allTemplates.map((t) => {
-                const isSel = selectedTplId === t.id;
-                return (
-                  <div
-                    key={t.id}
-                    className={cn(
-                      "cursor-pointer rounded-md border p-2 text-sm transition-colors",
-                      isSel ? "border-primary bg-primary/5" : "hover:bg-accent",
-                    )}
-                    onClick={() => setSelectedTplId(t.id)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{t.text}</div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                          {t.source === "builtin" ? (
-                            <Badge variant="outline" className="text-[10px] text-amber-600">⚙️ Built-in</Badge>
+          <CardContent>
+            {!lessonType ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                Chọn tuần có bài học Toán để xem/ thêm mẫu.
+              </p>
+            ) : (
+              <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                {isLoading && <p className="text-xs text-muted-foreground">Đang tải mẫu…</p>}
+                {allTemplates.length === 0 && !isLoading && (
+                  <p className="py-6 text-center text-xs text-muted-foreground">
+                    Chưa có mẫu cho loại bài “{lessonTypeLabel(lessonType)}”. Bấm “Thêm mẫu”.
+                  </p>
+                )}
+                {allTemplates.map((t) => {
+                  const isSel = selectedTplId === t.id;
+                  return (
+                    <div
+                      key={t.id}
+                      className={cn(
+                        "cursor-pointer rounded-md border p-2 text-sm transition-colors",
+                        isSel ? "border-primary bg-primary/5" : "hover:bg-accent",
+                      )}
+                      onClick={() => setSelectedTplId(t.id)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{t.text}</div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                            {t.source === "builtin" ? (
+                              <Badge variant="outline" className="text-[10px] text-amber-600">⚙️ Built-in</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] text-emerald-600">✏️ Custom</Badge>
+                            )}
+                            <Badge variant="secondary" className="text-[10px]">{skillLabel(t.skill)}</Badge>
+                            {t.formula !== "built-in" && (
+                              <code className="rounded bg-muted px-1 text-[10px]">{t.formula}</code>
+                            )}
+                            {t.condition && (
+                              <code className="rounded bg-amber-100 px-1 text-[10px] text-amber-700">{t.condition}</code>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
+                          {t.source === "user" ? (
+                            <>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" title="Sửa" onClick={() => openEditUser(t)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" title="Xoá" onClick={() => handleDelete(t.id)}>
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] text-emerald-600">✏️ Custom</Badge>
-                          )}
-                          <Badge variant="secondary" className="text-[10px]">{t.skill}</Badge>
-                          {t.formula !== "built-in" && (
-                            <code className="rounded bg-muted px-1 text-[10px]">{t.formula}</code>
+                            t.formula !== "built-in" && (
+                              <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" title="Sửa (tạo bản sao)" onClick={() => openCloneBuiltin(t)}>
+                                <Pencil className="h-3.5 w-3.5" /> Sửa
+                              </Button>
+                            )
                           )}
                         </div>
                       </div>
-                      <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
-                        {t.source === "user" ? (
-                          <>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" title="Sửa" onClick={() => openEditUser(t)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" title="Xoá" onClick={() => handleDelete(t.id)}>
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          </>
-                        ) : (
-                          // Built-in dạng khai báo (không có generator) → cho phép "Sửa" = sao chép thành mẫu custom
-                          t.formula !== "built-in" && (
-                            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" title="Sửa (tạo bản sao)" onClick={() => openCloneBuiltin(t)}>
-                              <Pencil className="h-3.5 w-3.5" /> Sửa
-                            </Button>
-                          )
-                        )}
-                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -360,20 +397,6 @@ export default function AiGenerateMathPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Lớp</Label>
-                <Input value={grade} disabled className="mt-1" />
-              </div>
-              <div>
-                <Label className="text-xs">Tuần (1-35)</Label>
-                <Input
-                  type="number" min={1} max={35} value={week}
-                  onChange={(e) => setWeek(Math.min(35, Math.max(1, Number(e.target.value))))}
-                  className="mt-1"
-                />
-              </div>
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Số câu (1-50)</Label>
@@ -455,9 +478,7 @@ export default function AiGenerateMathPage() {
                         <span className="font-medium text-muted-foreground">{i + 1}.</span> {q.text}
                       </div>
                       <div className="text-[12px] font-semibold text-emerald-600">✓ {q.correct_answer}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        Đáp án: {q.options.join(", ")}
-                      </div>
+                      <div className="text-[11px] text-muted-foreground">Đáp án: {q.options.join(", ")}</div>
                     </div>
                   </div>
                 );
@@ -473,9 +494,9 @@ export default function AiGenerateMathPage() {
           <div>
             <div className="font-semibold">Quy trình</div>
             <p className="mt-1">
-              Chọn/tạo mẫu → Generate → <strong>Xem trước &amp; Chỉnh sửa</strong> (gắn ảnh/audio nếu cần) →
-              <strong> Xuất Excel 12 cột</strong> → <strong>Bulk Import</strong> (cần bài <code className="rounded bg-sky-100 px-1">G{grade}_W{String(week).padStart(2, "0")}_MATH</code>) →
-              QA Queue duyệt → publish. Loại <code className="rounded bg-sky-100 px-1">comparison</code> (dấu &gt; &lt; =) chưa xuất 12 cột.
+              Chọn tuần (bám bài học) → chọn/tạo mẫu → Generate → <strong>Xem trước &amp; Chỉnh sửa</strong> (gắn ảnh/audio) →
+              <strong> Xuất Excel 12 cột</strong> → <strong>Bulk Import</strong> → QA Queue duyệt → publish.
+              Loại <code className="rounded bg-sky-100 px-1">comparison</code> (dấu &gt; &lt; =) chưa xuất 12 cột.
             </p>
           </div>
         </CardContent>
@@ -487,6 +508,7 @@ export default function AiGenerateMathPage() {
         lessonType={lessonType}
         editing={editing}
         initial={cloneSeed}
+        allowedSkills={allowedSkills}
         saving={saving}
         onSubmit={onSubmitTemplate}
       />
