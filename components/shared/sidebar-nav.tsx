@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   History,
   Sparkles,
+  Calculator,
   Settings,
   FolderOpen,
   BarChart3,
@@ -38,6 +39,7 @@ const NAV: NavItem[] = [
   { href: "/qa/queue", label: "QA Queue", icon: ShieldCheck, roles: ["admin", "qa"] },
   { href: "/qa/audit", label: "Audit Log", icon: History, roles: ["admin", "qa"] },
   { href: "/ai-generate", label: "AI Sinh đề Tiếng Anh", icon: Sparkles, roles: ["admin", "editor"] },
+  { href: "/ai-generate-math", label: "AI Sinh đề Toán", icon: Calculator, roles: ["admin", "editor"] },
   { href: "/settings", label: "Cài đặt", icon: Settings, roles: ["admin"] },
 ];
 
