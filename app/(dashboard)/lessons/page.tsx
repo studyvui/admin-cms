@@ -512,8 +512,10 @@ function buildCode(
   if (!course || !week || week < 1) return "";
   const w = String(week).padStart(2, "0");
   const sub = SUBJECT_CODE[course.subject] ?? course.subject.toUpperCase();
-  const suffix = orderIndex > 1 ? `_${orderIndex}` : "";
-  return `G${course.grade}_W${w}_${sub}${suffix}`;
+  // Model "bai con": moi tuan tach nhieu bai nho -> bai dau cung gan hau to _1
+  // (vd G1_W01_ENG_1, _2, _3, _4). Lesson cu trong DB giu ma bare khong doi.
+  const order = orderIndex >= 1 ? orderIndex : 1;
+  return `G${course.grade}_W${w}_${sub}_${order}`;
 }
 
 function LessonDialog({
