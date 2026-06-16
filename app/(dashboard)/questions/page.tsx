@@ -142,6 +142,11 @@ const mcSchema = baseSchema.extend({
   optionB: z.string().min(1),
   optionC: z.string().min(1),
   optionD: z.string().min(1),
+  // Ảnh cho từng đáp án (câu "chọn hình đúng từ âm thanh"). Chọn đủ 4 ảnh → ảnh[i] ↔ đáp án[i].
+  optionAImg: z.string().optional(),
+  optionBImg: z.string().optional(),
+  optionCImg: z.string().optional(),
+  optionDImg: z.string().optional(),
   correctOption: z.enum(["A", "B", "C", "D"]),
 });
 
@@ -269,7 +274,7 @@ export default function QuestionsPage() {
     (!isEditor || q.status === "draft" || q.status === "review");
 
   const onSubmit = (values: QuestionFormValues) => {
-    const assetRefs = (values.assetRefsCsv ?? "")
+    let assetRefs = (values.assetRefsCsv ?? "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
@@ -290,6 +295,21 @@ export default function QuestionsPage() {
       };
       correctAnswer =
         options.find((o) => o.key === values.correctOption)?.text ?? "";
+
+      // Câu "chọn hình đúng": nếu CHỌN ĐỦ 4 ảnh đáp án → ghép vào assetRefs theo thứ tự A→D
+      // (quy ước: số ảnh == số options → ảnh[i] là đáp án i). Audio đề bài giữ nguyên.
+      const optImgs = [
+        values.optionAImg,
+        values.optionBImg,
+        values.optionCImg,
+        values.optionDImg,
+      ].map((s) => (s ?? "").trim());
+      if (optImgs.every(Boolean)) {
+        const isImageKey = (k: string) =>
+          /\.(png|webp|jpe?g|gif|svg)$/i.test(k);
+        const nonImage = assetRefs.filter((r) => !isImageKey(r));
+        assetRefs = [...nonImage, ...optImgs];
+      }
     } else {
       content = JSON.parse(values.contentJson);
       correctAnswer = values.correctAnswer;
@@ -658,6 +678,12 @@ function QuestionDialog({
       const isFourOption = opts.length === 4;
       if (isFourOption) {
         const correctIdx = opts.findIndex((o) => o === editing.correctAnswer);
+        // Tách ảnh đáp án: nếu số ảnh trong assetRefs == số options → ảnh[i] ↔ đáp án[i].
+        const isImageKey = (k: string) =>
+          /\.(png|webp|jpe?g|gif|svg)$/i.test(k);
+        const imageRefs = editing.assetRefs.filter(isImageKey);
+        const perOptionImg = imageRefs.length === opts.length;
+        const nonImageRefs = editing.assetRefs.filter((r) => !isImageKey(r));
         return {
           mode: "mc",
           lessonId: editing.lessonId,
@@ -665,12 +691,19 @@ function QuestionDialog({
           type: editing.type,
           skill: editing.skill,
           difficulty: editing.difficulty,
-          assetRefsCsv: editing.assetRefs.join(", "),
+          // Khi ảnh là đáp án → field "Asset đính kèm" chỉ giữ audio đề bài.
+          assetRefsCsv: (perOptionImg ? nonImageRefs : editing.assetRefs).join(
+            ", ",
+          ),
           prompt: c.prompt ?? "",
           optionA: opts[0] ?? "",
           optionB: opts[1] ?? "",
           optionC: opts[2] ?? "",
           optionD: opts[3] ?? "",
+          optionAImg: perOptionImg ? imageRefs[0] : "",
+          optionBImg: perOptionImg ? imageRefs[1] : "",
+          optionCImg: perOptionImg ? imageRefs[2] : "",
+          optionDImg: perOptionImg ? imageRefs[3] : "",
           correctOption: (["A", "B", "C", "D"][correctIdx] ?? "A") as
             | "A"
             | "B"
@@ -703,6 +736,10 @@ function QuestionDialog({
       optionB: "",
       optionC: "",
       optionD: "",
+      optionAImg: "",
+      optionBImg: "",
+      optionCImg: "",
+      optionDImg: "",
       correctOption: "A",
     };
   }, [editing, lessonsInCourse]);
@@ -936,9 +973,24 @@ function QuestionDialog({
                       id={`option${k}`}
                       {...register(`option${k}` as const)}
                     />
+                    <OptionImageField
+                      value={(watch(`option${k}Img` as const) as string) ?? ""}
+                      onChange={(v) =>
+                        setValue(`option${k}Img` as const, v, {
+                          shouldValidate: true,
+                        })
+                      }
+                    />
                   </div>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                💡 Để tạo câu <b>&quot;chọn hình đúng từ âm thanh&quot;</b>: chọn
+                đủ <b>4 ảnh</b> cho A→D (ảnh sẽ là đáp án), điền chữ vào ô lựa
+                chọn làm nhãn, chọn audio đề bài ở mục{" "}
+                <b>&quot;Asset đính kèm&quot;</b> phía dưới, và đặt Loại câu hỏi
+                là <b>Chọn hình</b>.
+              </p>
               <div className="space-y-2">
                 <Label>Đáp án đúng</Label>
                 <Select
@@ -1018,6 +1070,51 @@ function QuestionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Picker ảnh cho 1 đáp án (câu "chọn hình đúng từ âm thanh"). Lưu key ảnh R2.
+function OptionImageField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+      >
+        <ImageIcon className="mr-1.5 h-4 w-4" />
+        {value ? "Đổi ảnh" : "Chọn ảnh"}
+      </Button>
+      {value ? (
+        <Badge variant="secondary" className="gap-1 font-mono">
+          <span className="truncate max-w-[110px]">
+            {value.split("/").pop()}
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="hover:text-destructive"
+            aria-label="Bỏ ảnh"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ) : null}
+      <ImagePicker
+        open={open}
+        onOpenChange={setOpen}
+        initialSelected={value ? [value] : []}
+        onConfirm={(picked) => onChange(picked[0] ?? "")}
+      />
+    </div>
   );
 }
 
