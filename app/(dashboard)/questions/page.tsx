@@ -162,6 +162,8 @@ const baseSchema = z.object({
   assetRefsCsv: z.string().optional(),
 });
 
+// "Trắc nghiệm 4 lựa chọn (đơn giản)": đề bài text (bắt buộc) + 4 đáp án text +
+// ảnh tuỳ chọn cho từng đáp án + đáp án đúng. Loại câu hỏi do người dùng chọn.
 const mcSchema = baseSchema.extend({
   mode: z.literal("mc"),
   prompt: z.string().min(1, "Cần đề bài"),
@@ -174,6 +176,36 @@ const mcSchema = baseSchema.extend({
   optionBImg: z.string().optional(),
   optionCImg: z.string().optional(),
   optionDImg: z.string().optional(),
+  correctOption: z.enum(["A", "B", "C", "D"]),
+});
+
+// "Ảnh rồi chọn từ": ảnh đề bài BẮT BUỘC (text đề bài tuỳ chọn); 4 lựa chọn là
+// TỪ (text, bắt buộc).
+const imageChoiceSchema = baseSchema.extend({
+  mode: z.literal("image_choice"),
+  prompt: z.string().optional(),
+  promptImage: z.string().min(1, "Cần chọn ảnh đề bài"),
+  optionA: z.string().min(1, "Cần nhập từ cho lựa chọn A"),
+  optionB: z.string().min(1, "Cần nhập từ cho lựa chọn B"),
+  optionC: z.string().min(1, "Cần nhập từ cho lựa chọn C"),
+  optionD: z.string().min(1, "Cần nhập từ cho lựa chọn D"),
+  correctOption: z.enum(["A", "B", "C", "D"]),
+});
+
+// "Nghe rồi chọn ảnh": audio đề bài BẮT BUỘC (text đề bài tuỳ chọn); 4 lựa chọn là
+// ẢNH (bắt buộc), KHÔNG nhập text.
+const audioChoiceSchema = baseSchema.extend({
+  mode: z.literal("audio_choice"),
+  prompt: z.string().optional(),
+  promptAudio: z.string().min(1, "Cần chọn audio đề bài"),
+  optionA: z.string().optional(),
+  optionB: z.string().optional(),
+  optionC: z.string().optional(),
+  optionD: z.string().optional(),
+  optionAImg: z.string().min(1, "Chọn ảnh cho lựa chọn A"),
+  optionBImg: z.string().min(1, "Chọn ảnh cho lựa chọn B"),
+  optionCImg: z.string().min(1, "Chọn ảnh cho lựa chọn C"),
+  optionDImg: z.string().min(1, "Chọn ảnh cho lựa chọn D"),
   correctOption: z.enum(["A", "B", "C", "D"]),
 });
 
@@ -203,9 +235,20 @@ const letterSchema = baseSchema.extend({
 
 const questionFormSchema = z.discriminatedUnion("mode", [
   mcSchema,
+  audioChoiceSchema,
+  imageChoiceSchema,
   jsonSchema,
   letterSchema,
 ]);
+
+// Nhãn hiển thị cho dropdown "Chế độ nhập".
+const MODE_LABELS: Record<string, string> = {
+  mc: "Trắc nghiệm 4 lựa chọn (đơn giản)",
+  letter: "Điền chữ còn thiếu (kéo thẻ chữ)",
+  audio_choice: "Nghe rồi chọn ảnh",
+  image_choice: "Ảnh rồi chọn từ",
+  json: "JSON raw (nâng cao)",
+};
 
 type QuestionFormValues = z.infer<typeof questionFormSchema>;
 
@@ -353,6 +396,55 @@ export default function QuestionsPage() {
         const nonImage = assetRefs.filter((r) => !isImageKey(r));
         assetRefs = [...nonImage, ...optImgs];
       }
+    } else if (values.mode === "image_choice") {
+      // "Ảnh rồi chọn từ": ảnh đề bài (bắt buộc) + 4 TỪ đáp án (text).
+      const options = [
+        values.optionA,
+        values.optionB,
+        values.optionC,
+        values.optionD,
+      ];
+      const correctIdx = { A: 0, B: 1, C: 2, D: 3 }[values.correctOption];
+      content = {
+        prompt: (values.prompt ?? "").trim(),
+        image: values.promptImage,
+        options,
+      };
+      correctAnswer = options[correctIdx] ?? "";
+      finalType = "image_choice";
+      // assetRefs = ảnh đề bài + phần asset khác (không phải ảnh, vd audio nếu có).
+      const isImageKey = (k: string) => /\.(png|webp|jpe?g|gif|svg)$/i.test(k);
+      const nonImage = assetRefs.filter((r) => !isImageKey(r));
+      assetRefs = [values.promptImage, ...nonImage];
+    } else if (values.mode === "audio_choice") {
+      // "Nghe rồi chọn ảnh": audio đề bài + 4 ẢNH đáp án (không text).
+      // Nhãn đáp án tự suy ra từ tên file ảnh (để có correctAnswer định danh được;
+      // ảnh hiển thị lấy theo thứ tự assetRefs ảnh[i] ↔ đáp án[i]).
+      const optImgs = [
+        values.optionAImg,
+        values.optionBImg,
+        values.optionCImg,
+        values.optionDImg,
+      ].map((s) => (s ?? "").trim());
+      const labelFromKey = (k: string) =>
+        (k.split("/").pop() ?? k).replace(/\.[a-z0-9]+$/i, "");
+      const labels = optImgs.map(labelFromKey);
+      const correctIdx = { A: 0, B: 1, C: 2, D: 3 }[values.correctOption];
+      content = {
+        prompt: (values.prompt ?? "").trim(),
+        audio: values.promptAudio,
+        options: labels,
+        optionImages: optImgs, // ảnh tương ứng từng đáp án, đúng thứ tự A→D
+      };
+      correctAnswer = labels[correctIdx] ?? "";
+      finalType = "audio_choice";
+      // assetRefs = audio đề bài + 4 ảnh đáp án (thứ tự A→D), bỏ trùng/ảnh cũ.
+      const isImageKey = (k: string) => /\.(png|webp|jpe?g|gif|svg)$/i.test(k);
+      const isAudioKey = (k: string) => /\.(mp3|ogg|wav|m4a)$/i.test(k);
+      const others = assetRefs.filter(
+        (r) => !isImageKey(r) && !isAudioKey(r),
+      );
+      assetRefs = [...others, values.promptAudio, ...optImgs];
     } else if (values.mode === "letter") {
       // Loại "Điền chữ còn thiếu": parse markedWord, tự sinh chữ nhiễu, trộn thành thẻ chữ.
       const parsed = parseMarkedWord(values.markedWord)!; // schema đã refine hợp lệ
@@ -762,6 +854,84 @@ function QuestionDialog({
         };
       }
 
+      // "Nghe rồi chọn ảnh" (audio_choice): audio đề bài + 4 ảnh đáp án (không text).
+      if (editing.type === "audio_choice") {
+        const ca = editing.content as {
+          prompt?: string;
+          audio?: string;
+          optionImages?: string[];
+        };
+        const isImageKey = (k: string) =>
+          /\.(png|webp|jpe?g|gif|svg)$/i.test(k);
+        const isAudioKey = (k: string) => /\.(mp3|ogg|wav|m4a)$/i.test(k);
+        const imageRefs = Array.isArray(ca.optionImages)
+          ? ca.optionImages
+          : editing.assetRefs.filter(isImageKey);
+        const audioRef =
+          ca.audio ?? editing.assetRefs.find(isAudioKey) ?? "";
+        const correctIdx = opts.findIndex((o) => o === editing.correctAnswer);
+        return {
+          mode: "audio_choice",
+          lessonId: editing.lessonId,
+          code: editing.code,
+          type: editing.type,
+          skill: editing.skill,
+          difficulty: editing.difficulty,
+          // Audio đề bài + ảnh đáp án có field riêng → "Asset đính kèm" chỉ giữ phần còn lại.
+          assetRefsCsv: editing.assetRefs
+            .filter((r) => !isImageKey(r) && !isAudioKey(r))
+            .join(", "),
+          prompt: ca.prompt ?? "",
+          promptAudio: audioRef,
+          optionA: opts[0] ?? "",
+          optionB: opts[1] ?? "",
+          optionC: opts[2] ?? "",
+          optionD: opts[3] ?? "",
+          optionAImg: imageRefs[0] ?? "",
+          optionBImg: imageRefs[1] ?? "",
+          optionCImg: imageRefs[2] ?? "",
+          optionDImg: imageRefs[3] ?? "",
+          correctOption: (["A", "B", "C", "D"][correctIdx] ?? "A") as
+            | "A"
+            | "B"
+            | "C"
+            | "D",
+        };
+      }
+
+      // "Ảnh rồi chọn từ" (image_choice): ảnh đề bài + 4 TỪ đáp án (text).
+      if (editing.type === "image_choice") {
+        const ci = editing.content as { prompt?: string; image?: string };
+        const isImageKey = (k: string) =>
+          /\.(png|webp|jpe?g|gif|svg)$/i.test(k);
+        const promptImage =
+          ci.image ?? editing.assetRefs.find(isImageKey) ?? "";
+        const correctIdx = opts.findIndex((o) => o === editing.correctAnswer);
+        return {
+          mode: "image_choice",
+          lessonId: editing.lessonId,
+          code: editing.code,
+          type: editing.type,
+          skill: editing.skill,
+          difficulty: editing.difficulty,
+          // Ảnh đề bài có field riêng → "Asset đính kèm" chỉ giữ phần còn lại.
+          assetRefsCsv: editing.assetRefs
+            .filter((r) => r !== promptImage)
+            .join(", "),
+          prompt: ci.prompt ?? "",
+          promptImage,
+          optionA: opts[0] ?? "",
+          optionB: opts[1] ?? "",
+          optionC: opts[2] ?? "",
+          optionD: opts[3] ?? "",
+          correctOption: (["A", "B", "C", "D"][correctIdx] ?? "A") as
+            | "A"
+            | "B"
+            | "C"
+            | "D",
+        };
+      }
+
       const isFourOption = opts.length === 4;
       if (isFourOption) {
         const correctIdx = opts.findIndex((o) => o === editing.correctAnswer);
@@ -796,7 +966,7 @@ function QuestionDialog({
             | "B"
             | "C"
             | "D",
-        };
+        } as QuestionFormValues; // mode là union McLike (3 nhánh cùng shape) → cast về union form.
       }
       return {
         mode: "json",
@@ -856,6 +1026,39 @@ function QuestionDialog({
     () => lessons.find((l) => l.id === watchedLessonId)?.skills ?? [],
     [watchedLessonId, lessons],
   );
+
+  // Bài học Tiếng Anh (code chứa "_ENG") → bộ "Chế độ nhập" riêng.
+  const isEngLesson = useMemo(
+    () =>
+      /_ENG/i.test(lessons.find((l) => l.id === watchedLessonId)?.code ?? ""),
+    [watchedLessonId, lessons],
+  );
+
+  // Danh sách mode hiển thị trong dropdown "Chế độ nhập".
+  const availableModes = useMemo(() => {
+    const base = isEngLesson
+      ? ["mc", "letter", "audio_choice", "image_choice"]
+      : ["mc", "letter", "json"];
+    // Khi sửa câu cũ có mode ngoài danh sách (vd json của bài ENG) → giữ để select hiển thị đúng.
+    return editing && !base.includes(mode) ? [...base, mode] : base;
+  }, [isEngLesson, editing, mode]);
+
+  // Khi đổi bài học làm mode hiện tại không còn hợp lệ (vd json → bài ENG) → về "mc".
+  useEffect(() => {
+    if (editing) return;
+    if (!availableModes.includes(mode)) {
+      setValue("mode", "mc", { shouldValidate: true });
+    }
+  }, [editing, availableModes, mode, setValue]);
+
+  // Mode chuyên biệt ép sẵn "Loại câu hỏi" cho khớp (người dùng vẫn thấy đúng loại).
+  useEffect(() => {
+    if (editing) return;
+    if (mode === "audio_choice") setValue("type", "audio_choice");
+    else if (mode === "image_choice") setValue("type", "image_choice");
+    else if (mode === "letter") setValue("type", "missing_letter");
+    else if (mode === "mc") setValue("type", "multiple_choice");
+  }, [mode, editing, setValue]);
 
   useEffect(() => {
     if (editing || !watchedLessonId) return;
@@ -1024,7 +1227,7 @@ function QuestionDialog({
             <Select
               value={mode}
               onValueChange={(v) =>
-                setValue("mode", v as "mc" | "json" | "letter", {
+                setValue("mode", v as QuestionFormValues["mode"], {
                   shouldValidate: true,
                 })
               }
@@ -1033,13 +1236,11 @@ function QuestionDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="mc">
-                  Trắc nghiệm 4 lựa chọn (đơn giản)
-                </SelectItem>
-                <SelectItem value="letter">
-                  Điền chữ còn thiếu (kéo thẻ chữ)
-                </SelectItem>
-                <SelectItem value="json">JSON raw (nâng cao)</SelectItem>
+                {availableModes.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {MODE_LABELS[m] ?? m}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -1101,6 +1302,181 @@ function QuestionDialog({
                     <SelectItem value="B">B</SelectItem>
                     <SelectItem value="C">C</SelectItem>
                     <SelectItem value="D">D</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : mode === "image_choice" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="prompt">
+                  Đề bài <span className="text-muted-foreground">(tuỳ chọn)</span>
+                </Label>
+                <Textarea
+                  id="prompt"
+                  rows={2}
+                  placeholder="VD: Đây là gì? (có thể bỏ trống)"
+                  {...register("prompt" as const)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  Hình ảnh đề bài <span className="text-destructive">*</span>
+                </Label>
+                <OptionImageField
+                  value={(watch("promptImage" as const) as string) ?? ""}
+                  onChange={(v) =>
+                    setValue("promptImage" as const, v, {
+                      shouldValidate: true,
+                    })
+                  }
+                />
+                {"promptImage" in errors && (
+                  <p className="text-xs text-destructive">
+                    {
+                      (errors as Record<string, { message?: string }>)
+                        .promptImage?.message
+                    }
+                  </p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                🖼️ <b>Ảnh rồi chọn từ</b>: học sinh nhìn ảnh đề bài rồi chọn{" "}
+                <b>1 trong 4 từ</b>. Ảnh đề bài bắt buộc; mỗi lựa chọn nhập{" "}
+                <b>1 từ</b> (không cần ảnh).
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {(["A", "B", "C", "D"] as const).map((k) => (
+                  <div key={k} className="space-y-2">
+                    <Label htmlFor={`option${k}`}>
+                      Lựa chọn {k} <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id={`option${k}`}
+                      {...register(`option${k}` as const)}
+                    />
+                    {`option${k}` in errors && (
+                      <p className="text-xs text-destructive">
+                        {
+                          (errors as Record<string, { message?: string }>)[
+                            `option${k}`
+                          ]?.message
+                        }
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Đáp án đúng (từ)</Label>
+                <Select
+                  value={watch("correctOption" as const)}
+                  onValueChange={(v) =>
+                    setValue(
+                      "correctOption" as const,
+                      v as "A" | "B" | "C" | "D",
+                      { shouldValidate: true },
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">A</SelectItem>
+                    <SelectItem value="B">B</SelectItem>
+                    <SelectItem value="C">C</SelectItem>
+                    <SelectItem value="D">D</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : mode === "audio_choice" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="prompt">
+                  Đề bài <span className="text-muted-foreground">(tuỳ chọn)</span>
+                </Label>
+                <Textarea
+                  id="prompt"
+                  rows={2}
+                  placeholder="VD: Nghe và chọn hình đúng (có thể bỏ trống)"
+                  {...register("prompt" as const)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  Âm thanh đề bài <span className="text-destructive">*</span>
+                </Label>
+                <OptionAudioField
+                  value={(watch("promptAudio" as const) as string) ?? ""}
+                  onChange={(v) =>
+                    setValue("promptAudio" as const, v, {
+                      shouldValidate: true,
+                    })
+                  }
+                />
+                {"promptAudio" in errors && (
+                  <p className="text-xs text-destructive">
+                    {
+                      (errors as Record<string, { message?: string }>)
+                        .promptAudio?.message
+                    }
+                  </p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                🔊 <b>Nghe rồi chọn ảnh</b>: học sinh nghe âm thanh đề bài rồi
+                chọn <b>1 trong 4 ảnh</b>. Mỗi lựa chọn chỉ cần <b>ảnh</b> (bắt
+                buộc), không cần nhập chữ.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {(["A", "B", "C", "D"] as const).map((k) => (
+                  <div key={k} className="space-y-2">
+                    <Label>
+                      Lựa chọn {k}{" "}
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <OptionImageField
+                      value={(watch(`option${k}Img` as const) as string) ?? ""}
+                      onChange={(v) =>
+                        setValue(`option${k}Img` as const, v, {
+                          shouldValidate: true,
+                        })
+                      }
+                    />
+                    {`option${k}Img` in errors && (
+                      <p className="text-xs text-destructive">
+                        {
+                          (errors as Record<string, { message?: string }>)[
+                            `option${k}Img`
+                          ]?.message
+                        }
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Đáp án đúng (ảnh)</Label>
+                <Select
+                  value={watch("correctOption" as const)}
+                  onValueChange={(v) =>
+                    setValue(
+                      "correctOption" as const,
+                      v as "A" | "B" | "C" | "D",
+                      { shouldValidate: true },
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">Ảnh A</SelectItem>
+                    <SelectItem value="B">Ảnh B</SelectItem>
+                    <SelectItem value="C">Ảnh C</SelectItem>
+                    <SelectItem value="D">Ảnh D</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1260,6 +1636,51 @@ function OptionImageField({
         </Badge>
       ) : null}
       <ImagePicker
+        open={open}
+        onOpenChange={setOpen}
+        initialSelected={value ? [value] : []}
+        onConfirm={(picked) => onChange(picked[0] ?? "")}
+      />
+    </div>
+  );
+}
+
+// Chọn 1 audio (cho "Âm thanh đề bài" của câu "Nghe rồi chọn ảnh").
+function OptionAudioField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+      >
+        <Music className="mr-1.5 h-4 w-4" />
+        {value ? "Đổi audio" : "Chọn audio"}
+      </Button>
+      {value ? (
+        <Badge variant="secondary" className="gap-1 font-mono">
+          <span className="truncate max-w-[160px]">
+            {value.split("/").pop()}
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="hover:text-destructive"
+            aria-label="Bỏ audio"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ) : null}
+      <AudioPicker
         open={open}
         onOpenChange={setOpen}
         initialSelected={value ? [value] : []}
