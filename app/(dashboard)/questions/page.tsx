@@ -123,6 +123,33 @@ const QUESTION_STATUS_LABELS: Record<QuestionStatus, string> = {
 
 const QUESTION_TYPES = Object.keys(QUESTION_TYPE_LABELS);
 
+// ── Helpers cho loại "Điền chữ còn thiếu" (mode "letter") ──
+// Cú pháp: gõ từ với [..] bao các chữ bị ẩn. Vd "h[el]lo" → prefix "h", hidden "el", suffix "lo".
+function parseMarkedWord(
+  s: string,
+): { prefix: string; hidden: string; suffix: string } | null {
+  const m = (s ?? "").trim().match(/^([a-zA-Z]*)\[([a-zA-Z]+)\]([a-zA-Z]*)$/);
+  if (!m) return null;
+  return { prefix: m[1], hidden: m[2], suffix: m[3] };
+}
+
+function shuffleArr<T>(a: T[]): T[] {
+  const r = a.slice();
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [r[i], r[j]] = [r[j], r[i]];
+  }
+  return r;
+}
+
+// Sinh n chữ cái nhiễu ngẫu nhiên, KHÁC các chữ trong exclude (chữ đáp án).
+function genDistractorLetters(exclude: Set<string>, n: number): string[] {
+  const pool = "abcdefghijklmnopqrstuvwxyz"
+    .split("")
+    .filter((c) => !exclude.has(c));
+  return shuffleArr(pool).slice(0, Math.max(0, n));
+}
+
 const baseSchema = z.object({
   lessonId: z.string().uuid("Chọn bài học"),
   code: z
@@ -163,7 +190,22 @@ const jsonSchema = baseSchema.extend({
   correctAnswer: z.string().min(1),
 });
 
-const questionFormSchema = z.discriminatedUnion("mode", [mcSchema, jsonSchema]);
+const letterSchema = baseSchema.extend({
+  mode: z.literal("letter"),
+  prompt: z.string().optional(),
+  markedWord: z
+    .string()
+    .min(1)
+    .refine((v) => parseMarkedWord(v) !== null, {
+      message: "Gõ từ có đúng 1 cặp [..] bao chữ ẩn, vd: h[el]lo",
+    }),
+});
+
+const questionFormSchema = z.discriminatedUnion("mode", [
+  mcSchema,
+  jsonSchema,
+  letterSchema,
+]);
 
 type QuestionFormValues = z.infer<typeof questionFormSchema>;
 
@@ -281,6 +323,7 @@ export default function QuestionsPage() {
 
     let content: Record<string, unknown>;
     let correctAnswer: string;
+    let finalType = values.type;
 
     if (values.mode === "mc") {
       const options = [
@@ -310,6 +353,26 @@ export default function QuestionsPage() {
         const nonImage = assetRefs.filter((r) => !isImageKey(r));
         assetRefs = [...nonImage, ...optImgs];
       }
+    } else if (values.mode === "letter") {
+      // Loại "Điền chữ còn thiếu": parse markedWord, tự sinh chữ nhiễu, trộn thành thẻ chữ.
+      const parsed = parseMarkedWord(values.markedWord)!; // schema đã refine hợp lệ
+      const hiddenChars = parsed.hidden.toLowerCase().split("");
+      const answerSet = new Set(hiddenChars);
+      const distractors = genDistractorLetters(
+        answerSet,
+        Math.max(2, 4 - hiddenChars.length),
+      );
+      const tiles = shuffleArr([...hiddenChars, ...distractors]);
+      content = {
+        prompt: (values.prompt ?? "").trim() || "Điền chữ còn thiếu",
+        word: parsed.prefix + parsed.hidden + parsed.suffix,
+        prefix: parsed.prefix,
+        suffix: parsed.suffix,
+        blanks: hiddenChars.length,
+        tiles,
+      };
+      correctAnswer = parsed.hidden.toLowerCase();
+      finalType = "missing_letter"; // ép loại, bỏ qua dropdown
     } else {
       content = JSON.parse(values.contentJson);
       correctAnswer = values.correctAnswer;
@@ -319,7 +382,7 @@ export default function QuestionsPage() {
       updateMut.mutate({
         id: editing.id,
         input: {
-          type: values.type,
+          type: finalType,
           skill: values.skill,
           difficulty: values.difficulty,
           content,
@@ -331,7 +394,7 @@ export default function QuestionsPage() {
       createMut.mutate({
         lessonId: values.lessonId,
         code: values.code,
-        type: values.type,
+        type: finalType,
         skill: values.skill,
         difficulty: values.difficulty,
         content,
@@ -675,6 +738,30 @@ function QuestionDialog({
         options?: string[];
       };
       const opts = Array.isArray(c?.options) ? c.options : [];
+
+      // Loại "Điền chữ còn thiếu": content có `tiles` → mode "letter", dựng lại markedWord.
+      const cl = editing.content as {
+        prompt?: string;
+        prefix?: string;
+        suffix?: string;
+        tiles?: unknown;
+      };
+      if (Array.isArray(cl.tiles)) {
+        const prefix = typeof cl.prefix === "string" ? cl.prefix : "";
+        const suffix = typeof cl.suffix === "string" ? cl.suffix : "";
+        return {
+          mode: "letter",
+          lessonId: editing.lessonId,
+          code: editing.code,
+          type: editing.type,
+          skill: editing.skill,
+          difficulty: editing.difficulty,
+          assetRefsCsv: editing.assetRefs.join(", "),
+          prompt: cl.prompt ?? "",
+          markedWord: prefix + "[" + editing.correctAnswer + "]" + suffix,
+        };
+      }
+
       const isFourOption = opts.length === 4;
       if (isFourOption) {
         const correctIdx = opts.findIndex((o) => o === editing.correctAnswer);
@@ -937,7 +1024,7 @@ function QuestionDialog({
             <Select
               value={mode}
               onValueChange={(v) =>
-                setValue("mode", v as "mc" | "json", {
+                setValue("mode", v as "mc" | "json" | "letter", {
                   shouldValidate: true,
                 })
               }
@@ -948,6 +1035,9 @@ function QuestionDialog({
               <SelectContent>
                 <SelectItem value="mc">
                   Trắc nghiệm 4 lựa chọn (đơn giản)
+                </SelectItem>
+                <SelectItem value="letter">
+                  Điền chữ còn thiếu (kéo thẻ chữ)
                 </SelectItem>
                 <SelectItem value="json">JSON raw (nâng cao)</SelectItem>
               </SelectContent>
@@ -1015,6 +1105,43 @@ function QuestionDialog({
                 </Select>
               </div>
             </>
+          ) : mode === "letter" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="prompt">Đề bài (tuỳ chọn)</Label>
+                <Input
+                  id="prompt"
+                  placeholder="Điền chữ còn thiếu"
+                  {...register("prompt" as const)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="markedWord">Từ có đánh dấu chỗ ẩn</Label>
+                <Input
+                  id="markedWord"
+                  placeholder="h[el]lo"
+                  className="font-mono"
+                  {...register("markedWord" as const)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Gõ từ, bao các chữ bị ẩn trong <b>[ ]</b>. Vd{" "}
+                  <code>h[el]lo</code> → hiện <b>h _ _ l o</b>, đáp án <b>el</b>.
+                  Chữ gây nhiễu hệ thống tự sinh. Audio (nếu có) chọn ở{" "}
+                  <b>&quot;Asset đính kèm&quot;</b>.
+                </p>
+                {"markedWord" in errors && (
+                  <p className="text-xs text-destructive">
+                    {
+                      (errors as Record<string, { message?: string }>)
+                        .markedWord?.message
+                    }
+                  </p>
+                )}
+                <LetterFillPreview
+                  marked={(watch("markedWord" as const) as string) ?? ""}
+                />
+              </div>
+            </>
           ) : (
             <>
               <div className="space-y-2">
@@ -1070,6 +1197,30 @@ function QuestionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Xem trước câu "Điền chữ còn thiếu" ngay trong form.
+function LetterFillPreview({ marked }: { marked: string }) {
+  const parsed = parseMarkedWord(marked);
+  if (!parsed) return null;
+  const sp = (s: string) => s.split("").join(" ");
+  const slots = parsed.hidden
+    .split("")
+    .map(() => "_")
+    .join(" ");
+  const display = [sp(parsed.prefix), slots, sp(parsed.suffix)]
+    .filter(Boolean)
+    .join("   ");
+  return (
+    <div className="rounded-md border bg-muted/30 p-2 text-sm">
+      <span className="text-muted-foreground">Xem trước: </span>
+      <span className="font-mono font-semibold tracking-wide">{display}</span>
+      <span className="text-muted-foreground"> · đáp án: </span>
+      <span className="font-mono font-semibold">
+        {parsed.hidden.toLowerCase()}
+      </span>
+    </div>
   );
 }
 
