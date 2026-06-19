@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sparkles, Wand2, Loader2, Download, Info, Play } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ import { generateEnglishQuestionsWithProgress } from "@/lib/eng-gen/master-gener
 import { toBulkRows, downloadBulkXlsx } from "@/lib/eng-gen/export-xlsx";
 import { generatedToQuestion } from "@/lib/eng-gen/to-question";
 import { QuestionPreviewModal } from "@/components/question-preview/question-preview-modal";
+import { coursesApi } from "@/lib/api/courses";
+import { lessonsApi } from "@/lib/api/lessons";
+import type { Course, Lesson } from "@/lib/types";
 import type { Question } from "@/lib/types";
 import type { GeneratedQuestion, GenReport, Skill, BlueprintType } from "@/lib/eng-gen/types";
 
@@ -47,15 +50,102 @@ const BLUEPRINTS_BY_SKILL: Record<Skill, { value: BlueprintType; label: string }
 const EXPORTABLE = new Set(["image_choice", "audio_choice", "missing_letter", "multiple_choice"]);
 const DIFF_COLOR: Record<number, string> = { 1: "#10b981", 2: "#f59e0b", 3: "#ef4444" };
 
+// Mapping DB skill keys → generator Skill type (case-insensitive lookup)
+const DB_SKILL_TO_GENERATOR: Record<string, Skill> = {
+  vocabulary: "vocabulary",
+  vocab: "vocabulary",
+  "từ vựng": "vocabulary",
+  phonics: "phonics",
+  sentence: "sentence",
+  listening: "listening",
+  nghe: "listening",
+  review: "review",
+  "ôn tập": "review",
+};
+
 export default function AiGeneratePage() {
-  const [grade] = useState(1);
-  const [week, setWeek] = useState(1);
+  /* ---- Courses & Lessons from API ---- */
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [courseId, setCourseId] = useState<string>("");
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [lessonId, setLessonId] = useState<string>("");
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const [loadingLessons, setLoadingLessons] = useState(false);
+
+  // Fetch courses on mount
+  useEffect(() => {
+    setLoadingCourses(true);
+    coursesApi
+      .list()
+      .then((data) => {
+        const active = data.filter((c) => c.isActive);
+        setCourses(active);
+        if (active.length > 0) {
+          setCourseId(active[0].id);
+        }
+      })
+      .catch((e) => console.error("[ai-generate] load courses:", e))
+      .finally(() => setLoadingCourses(false));
+  }, []);
+
+  // Fetch lessons when courseId changes
+  useEffect(() => {
+    if (!courseId) {
+      setLessons([]);
+      setLessonId("");
+      return;
+    }
+    setLoadingLessons(true);
+    lessonsApi
+      .list({ courseId })
+      .then((data) => {
+        // Sort by week then orderIndex
+        const sorted = data.sort((a, b) => a.week - b.week || a.orderIndex - b.orderIndex);
+        setLessons(sorted);
+        setLessonId(sorted.length > 0 ? sorted[0].id : "");
+      })
+      .catch((e) => console.error("[ai-generate] load lessons:", e))
+      .finally(() => setLoadingLessons(false));
+  }, [courseId]);
+
+  // Derived values from selected course/lesson
+  const selectedCourse = courses.find((c) => c.id === courseId);
+  const selectedLesson = lessons.find((l) => l.id === lessonId);
+  const grade = selectedCourse?.grade ?? 1;
+  const week = selectedLesson?.week ?? 1;
+
+  // Filter skills based on selected lesson's skills array — computed every render
+  // (only 5 items, no need for memoization)
+  let availableSkills = SKILLS;
+  if (selectedLesson && selectedLesson.skills && selectedLesson.skills.length > 0) {
+    const mapped = new Set<Skill>();
+    for (const s of selectedLesson.skills) {
+      const gen = DB_SKILL_TO_GENERATOR[s.toLowerCase()];
+      if (gen) mapped.add(gen);
+    }
+    if (mapped.size > 0) {
+      const filtered = SKILLS.filter((sk) => mapped.has(sk.value));
+      if (filtered.length > 0) availableSkills = filtered;
+    }
+  }
+
+  /* ---- Generator config ---- */
   const [skill, setSkill] = useState<Skill>("vocabulary");
   const [blueprint, setBlueprint] = useState<BlueprintType>("image_choice");
   const [count, setCount] = useState(10);
   const [dMin, setDMin] = useState(1);
   const [dMax, setDMax] = useState(2);
   const [startSeq, setStartSeq] = useState(101);
+
+  // Auto-reset skill when lesson changes and current skill is not available
+  useEffect(() => {
+    if (availableSkills.length > 0 && !availableSkills.some((s) => s.value === skill)) {
+      const first = availableSkills[0].value;
+      setSkill(first);
+      setBlueprint(BLUEPRINTS_BY_SKILL[first][0].value);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId]);
 
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -169,20 +259,57 @@ export default function AiGeneratePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
+              {/* Khóa học (thay cho Lớp) */}
               <div>
-                <Label className="text-xs">Lớp</Label>
-                <Input value={grade} disabled className="mt-1" />
+                <Label className="text-xs">Khóa học</Label>
+                {loadingCourses ? (
+                  <div className="mt-1 flex h-10 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Đang tải…
+                  </div>
+                ) : courses.length === 0 ? (
+                  <div className="mt-1 flex h-10 items-center rounded-md border px-3 text-sm text-muted-foreground">
+                    Chưa có khóa học
+                  </div>
+                ) : (
+                  <Select value={courseId} onValueChange={(v) => setCourseId(v)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Chọn khóa học" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courses.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name} ({c.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
+              {/* Bài học (thay cho Tuần) */}
               <div>
-                <Label className="text-xs">Tuần (1-35)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={35}
-                  value={week}
-                  onChange={(e) => setWeek(Math.min(35, Math.max(1, Number(e.target.value))))}
-                  className="mt-1"
-                />
+                <Label className="text-xs">Bài học</Label>
+                {loadingLessons ? (
+                  <div className="mt-1 flex h-10 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Đang tải…
+                  </div>
+                ) : lessons.length === 0 ? (
+                  <div className="mt-1 flex h-10 items-center rounded-md border px-3 text-sm text-muted-foreground">
+                    {courseId ? "Chưa có bài học" : "Chọn khóa học trước"}
+                  </div>
+                ) : (
+                  <Select value={lessonId} onValueChange={(v) => setLessonId(v)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Chọn bài học" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lessons.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          Tuần {l.week} — {l.name} ({l.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
 
@@ -194,7 +321,7 @@ export default function AiGeneratePage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {SKILLS.map((s) => (
+                    {availableSkills.map((s) => (
                       <SelectItem key={s.value} value={s.value}>
                         {s.label}
                       </SelectItem>
@@ -249,7 +376,7 @@ export default function AiGeneratePage() {
               </p>
             </div>
 
-            <Button className="w-full" onClick={runGenerate} disabled={generating}>
+            <Button className="w-full" onClick={runGenerate} disabled={generating || !courseId || !lessonId}>
               {generating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -378,3 +505,4 @@ export default function AiGeneratePage() {
     </div>
   );
 }
+
