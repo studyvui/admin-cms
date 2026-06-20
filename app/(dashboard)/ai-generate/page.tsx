@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Sparkles, Wand2, Loader2, Download, Info, Play } from "lucide-react";
+import { Sparkles, Wand2, Loader2, Download, Upload, Info, Play } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +20,10 @@ import { generatedToQuestion } from "@/lib/eng-gen/to-question";
 import { QuestionPreviewModal } from "@/components/question-preview/question-preview-modal";
 import { coursesApi } from "@/lib/api/courses";
 import { lessonsApi } from "@/lib/api/lessons";
-import type { Course, Lesson } from "@/lib/types";
+import { assetsApi } from "@/lib/api/assets";
+import type { AssetItem, Course, CreateQuestionInput, Lesson } from "@/lib/types";
 import type { Question } from "@/lib/types";
+import { questionsApi } from "@/lib/api/questions";
 import type { GeneratedQuestion, GenReport, Skill, BlueprintType } from "@/lib/eng-gen/types";
 
 const SKILLS: { value: Skill; label: string }[] = [
@@ -45,6 +47,22 @@ const BLUEPRINTS_BY_SKILL: Record<Skill, { value: BlueprintType; label: string }
     { value: "image_choice", label: "🖼️ Ôn qua hình" },
     { value: "audio_choice", label: "🔊 Ôn qua âm thanh" },
   ],
+};
+
+type InputMode = "mc" | "letter" | "audio_choice" | "image_choice";
+
+const INPUT_MODES: { value: InputMode; label: string }[] = [
+  { value: "mc", label: "Trắc nghiệm 4 lựa chọn (đơn giản)" },
+  { value: "letter", label: "Điền chữ còn thiếu (kéo thẻ chữ)" },
+  { value: "audio_choice", label: "Nghe rồi chọn ảnh" },
+  { value: "image_choice", label: "Ảnh rồi chọn từ" },
+];
+
+const MODE_TO_BLUEPRINT: Record<InputMode, BlueprintType> = {
+  mc: "image_choice",
+  letter: "missing_letter",
+  audio_choice: "audio_choice",
+  image_choice: "image_choice",
 };
 
 const EXPORTABLE = new Set(["image_choice", "audio_choice", "missing_letter", "multiple_choice"]);
@@ -78,7 +96,7 @@ export default function AiGeneratePage() {
     coursesApi
       .list()
       .then((data) => {
-        const active = data.filter((c) => c.isActive);
+        const active = data.filter((c) => c.isActive && c.subject === "english");
         setCourses(active);
         if (active.length > 0) {
           setCourseId(active[0].id);
@@ -131,18 +149,19 @@ export default function AiGeneratePage() {
 
   /* ---- Generator config ---- */
   const [skill, setSkill] = useState<Skill>("vocabulary");
-  const [blueprint, setBlueprint] = useState<BlueprintType>("image_choice");
+  const [mode, setMode] = useState<InputMode>("image_choice");
   const [count, setCount] = useState(10);
   const [dMin, setDMin] = useState(1);
   const [dMax, setDMax] = useState(2);
   const [startSeq, setStartSeq] = useState(101);
+
+  const blueprint = MODE_TO_BLUEPRINT[mode];
 
   // Auto-reset skill when lesson changes and current skill is not available
   useEffect(() => {
     if (availableSkills.length > 0 && !availableSkills.some((s) => s.value === skill)) {
       const first = availableSkills[0].value;
       setSkill(first);
-      setBlueprint(BLUEPRINTS_BY_SKILL[first][0].value);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
@@ -155,8 +174,6 @@ export default function AiGeneratePage() {
   const [previewQ, setPreviewQ] = useState<Question | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const blueprintOptions = BLUEPRINTS_BY_SKILL[skill];
-
   const selectedQuestions = useMemo(
     () => questions.filter((_, i) => selected.has(i)),
     [questions, selected],
@@ -167,10 +184,228 @@ export default function AiGeneratePage() {
   );
 
   function onSkillChange(v: string) {
-    const s = v as Skill;
-    setSkill(s);
-    const first = BLUEPRINTS_BY_SKILL[s][0].value;
-    setBlueprint(first);
+    setSkill(v as Skill);
+  }
+
+  function cdnToAssetKey(url: string): string {
+    if (!url) return "";
+    const m = url.match(/cdn\.studyvui\.vn\/(.+)$/);
+    if (m) return m[1];
+    if (url.startsWith("http")) { try { return new URL(url).pathname.replace(/^\//, ""); } catch { /* fall through */ } }
+    return url;
+  }
+
+  function labelFromPath(p: string): string {
+    return (p.split("/").pop() ?? p).replace(/\.[a-z0-9]+$/i, "");
+  }
+
+  function pickRandomImage(word: string, imageAssets: AssetItem[]): string {
+    const lower = word.toLowerCase().replace(/\s+/g, "_");
+    const matches = imageAssets.filter((a) => {
+      const filename = (a.key.split("/").pop() ?? "").toLowerCase();
+      return filename.startsWith(lower + "_") || filename.startsWith(lower + ".");
+    });
+    if (matches.length === 0) return "";
+    return matches[Math.floor(Math.random() * matches.length)].key;
+  }
+
+  function generateAudioChoice(imageAssets: AssetItem[]): { questions: GeneratedQuestion[]; report: GenReport } {
+    const vocab = selectedLesson?.vocabulary ?? [];
+    const withAudio = vocab.filter((v) => v.audioUrl);
+    if (withAudio.length === 0) throw new Error("Bài học này chưa có từ vựng có audio.");
+
+    const allVocab = lessons.flatMap((l) => l.vocabulary ?? []);
+    const qs: GeneratedQuestion[] = [];
+    const report: GenReport = { generated: 0, duplicates: 0, qa_failed: 0, missing_assets: [] };
+    const lessonCode = selectedLesson!.code;
+
+    for (let i = 0; i < count; i++) {
+      const vi = withAudio[i % withAudio.length];
+      const word = vi.word;
+
+      const correctImageKey = pickRandomImage(word, imageAssets) || cdnToAssetKey(vi.imageUrl ?? "");
+      if (!correctImageKey) { report.qa_failed++; continue; }
+
+      const distractorPool = allVocab.filter((v) => v.word !== word);
+      const shuffled = [...distractorPool].sort(() => Math.random() - 0.5);
+      const distractorImagePaths: string[] = [];
+      for (const dv of shuffled) {
+        if (distractorImagePaths.length >= 3) break;
+        const img = pickRandomImage(dv.word, imageAssets);
+        if (img) distractorImagePaths.push(img);
+      }
+
+      if (distractorImagePaths.length < 3) { report.qa_failed++; continue; }
+
+      const audioKey = cdnToAssetKey(vi.audioUrl!);
+      const correctLabel = labelFromPath(correctImageKey);
+      const distractorLabels = distractorImagePaths.map(labelFromPath);
+
+      const seq = startSeq + i;
+      const code = `${lessonCode}_${String(seq).padStart(3, "0")}`;
+
+      qs.push({
+        id: code,
+        grade, week, skill,
+        blueprintType: "audio_choice",
+        blueprint_type: "audio_choice",
+        difficulty: dMin,
+        lifecycleStatus: "draft",
+        components: {
+          stem: "Nghe và chọn hình đúng",
+          vocab: word,
+          meaning: vi.meaning ?? null,
+          distractors: distractorLabels,
+          assets: { audio: audioKey, image: correctImageKey },
+        },
+        correct_answer: correctLabel,
+        render_spec: null,
+        variable_values: {
+          word, grade, week,
+          optionImages: [correctImageKey, ...distractorImagePaths],
+        },
+        distractor_strategy: "same_topic",
+        template_id: `audio_choice_vocab_${i}`,
+        syncStatus: "pending",
+        tags: [],
+      });
+      report.generated++;
+    }
+    return { questions: qs, report };
+  }
+
+  function generateImageChoiceFromVocab(imageAssets: AssetItem[]): { questions: GeneratedQuestion[]; report: GenReport } {
+    const vocab = selectedLesson?.vocabulary ?? [];
+    const withAssets = vocab.filter((v) => v.meaning);
+    if (withAssets.length === 0) throw new Error("Bài học này chưa có từ vựng có nghĩa tiếng Việt.");
+
+    const allVocab = lessons.flatMap((l) => l.vocabulary ?? []).filter((v) => v.meaning);
+    const qs: GeneratedQuestion[] = [];
+    const report: GenReport = { generated: 0, duplicates: 0, qa_failed: 0, missing_assets: [] };
+    const lessonCode = selectedLesson!.code;
+
+    for (let i = 0; i < count; i++) {
+      const vi = withAssets[i % withAssets.length];
+      const word = vi.word;
+      const correctMeaning = vi.meaning!;
+
+      const distractorPool = allVocab.filter((v) => v.word !== word && v.meaning && v.meaning !== correctMeaning);
+      const shuffled = [...distractorPool].sort(() => Math.random() - 0.5);
+      const distractorMeanings = shuffled.slice(0, 3).map((v) => v.meaning!);
+
+      if (distractorMeanings.length < 3) { report.qa_failed++; continue; }
+
+      const imageKey = pickRandomImage(word, imageAssets) || cdnToAssetKey(vi.imageUrl ?? "");
+      const audioKey = vi.audioUrl ? cdnToAssetKey(vi.audioUrl) : "";
+
+      const seq = startSeq + i;
+      const code = `${lessonCode}_${String(seq).padStart(3, "0")}`;
+
+      qs.push({
+        id: code,
+        grade, week, skill,
+        blueprintType: "image_choice",
+        blueprint_type: "image_choice",
+        difficulty: dMin,
+        lifecycleStatus: "draft",
+        components: {
+          stem: "Nhìn hình và chọn nghĩa đúng",
+          vocab: word,
+          meaning: correctMeaning,
+          distractors: distractorMeanings,
+          assets: { image: imageKey, audio: audioKey },
+        },
+        correct_answer: correctMeaning,
+        render_spec: null,
+        variable_values: { word, grade, week },
+        distractor_strategy: "same_topic",
+        template_id: `image_choice_vocab_${i}`,
+        syncStatus: "pending",
+        tags: [],
+      });
+      report.generated++;
+    }
+    return { questions: qs, report };
+  }
+
+  function generateLetterFromVocab(imageAssets: AssetItem[]): { questions: GeneratedQuestion[]; report: GenReport } {
+    const vocab = selectedLesson?.vocabulary ?? [];
+    if (vocab.length === 0) throw new Error("Bài học này chưa có từ vựng.");
+
+    const qs: GeneratedQuestion[] = [];
+    const report: GenReport = { generated: 0, duplicates: 0, qa_failed: 0, missing_assets: [] };
+    const lessonCode = selectedLesson!.code;
+    const allLetters = "abcdefghijklmnopqrstuvwxyz";
+
+    for (let i = 0; i < count; i++) {
+      const vi = vocab[i % vocab.length];
+      const word = vi.word.toLowerCase();
+      const hideCount = word.length <= 2 ? 1 : 2;
+
+      const indices = Array.from({ length: word.length }, (_, idx) => idx);
+      for (let j = indices.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        [indices[j], indices[k]] = [indices[k], indices[j]];
+      }
+      const hiddenIndices = indices.slice(0, hideCount).sort((a, b) => a - b);
+      const hiddenChars = hiddenIndices.map((idx) => word[idx]);
+
+      let pattern = "";
+      for (let c = 0; c < word.length; c++) {
+        pattern += hiddenIndices.includes(c) ? "_" : word[c];
+      }
+
+      const answerSet = new Set(hiddenChars);
+      const distractorLetters: string[] = [];
+      const pool = allLetters.split("").filter((ch) => !answerSet.has(ch));
+      for (let d = pool.length - 1; d > 0; d--) {
+        const k = Math.floor(Math.random() * (d + 1));
+        [pool[d], pool[k]] = [pool[k], pool[d]];
+      }
+      const needed = Math.max(2, 4 - hideCount);
+      distractorLetters.push(...pool.slice(0, needed));
+
+      const imageKey = pickRandomImage(vi.word, imageAssets) || cdnToAssetKey(vi.imageUrl ?? "");
+      const audioKey = vi.audioUrl ? cdnToAssetKey(vi.audioUrl) : "";
+
+      const seq = startSeq + i;
+      const code = `${lessonCode}_${String(seq).padStart(3, "0")}`;
+
+      qs.push({
+        id: code,
+        grade, week, skill,
+        blueprintType: "missing_letter",
+        blueprint_type: "missing_letter",
+        difficulty: dMin,
+        lifecycleStatus: "draft",
+        components: {
+          stem: "Điền chữ còn thiếu",
+          vocab: word,
+          meaning: vi.meaning ?? null,
+          distractors: distractorLetters,
+          assets: { image: imageKey, audio: audioKey },
+        },
+        correct_answer: hiddenChars.join(""),
+        render_spec: {
+          blueprint_type: "missing_letter",
+          vocab_word: word,
+          image_path: imageKey,
+          audio_path: audioKey,
+          correct_letter: hiddenChars.join(""),
+          missing_word: pattern,
+          gap_position: hiddenIndices[0],
+          sentence_words: null,
+          correct_order: null,
+        },
+        variable_values: { word, grade, week, pattern, hiddenChars, tiles: [...hiddenChars, ...distractorLetters] },
+        distractor_strategy: "mixed",
+        template_id: `letter_vocab_${i}`,
+        syncStatus: "pending",
+        tags: [],
+      });
+      report.generated++;
+    }
+    return { questions: qs, report };
   }
 
   async function runGenerate() {
@@ -180,19 +415,36 @@ export default function AiGeneratePage() {
     setReport(null);
     setSelected(new Set());
     try {
-      const range: [number, number] = [Math.min(dMin, dMax), Math.max(dMin, dMax)];
-      const { questions: qs, report: rpt } = await generateEnglishQuestionsWithProgress(
-        {
-          grade,
-          week,
-          skill,
-          blueprintType: blueprint,
-          count,
-          difficultyRange: range,
-          options: { useAIWording: false, seed: Date.now(), wordList: [] },
-        },
-        (current, total) => setProgress(Math.round((current / total) * 100)),
-      );
+      let qs: GeneratedQuestion[];
+      let rpt: GenReport;
+
+      if (mode === "audio_choice" || mode === "image_choice" || mode === "letter") {
+        const imgAssets = await assetsApi.list({ type: "image" });
+        const result = mode === "audio_choice"
+          ? generateAudioChoice(imgAssets)
+          : mode === "image_choice"
+            ? generateImageChoiceFromVocab(imgAssets)
+            : generateLetterFromVocab(imgAssets);
+        qs = result.questions;
+        rpt = result.report;
+      } else {
+        const range: [number, number] = [Math.min(dMin, dMax), Math.max(dMin, dMax)];
+        const result = await generateEnglishQuestionsWithProgress(
+          {
+            grade,
+            week,
+            skill,
+            blueprintType: blueprint,
+            count,
+            difficultyRange: range,
+            options: { useAIWording: false, seed: Date.now(), wordList: [] },
+          },
+          (current, total) => setProgress(Math.round((current / total) * 100)),
+        );
+        qs = result.questions;
+        rpt = result.report;
+      }
+
       setQuestions(qs);
       setReport(rpt);
       setSelected(new Set(qs.map((_, i) => i)));
@@ -220,8 +472,38 @@ export default function AiGeneratePage() {
     setPreviewOpen(true);
   }
 
+  const [importing, setImporting] = useState(false);
+
+  function generatedToInput(q: GeneratedQuestion): CreateQuestionInput {
+    const converted = generatedToQuestion(q);
+    return {
+      lessonId: selectedLesson!.id,
+      code: q.id,
+      type: converted.type,
+      skill: q.skill,
+      difficulty: q.difficulty,
+      content: converted.content,
+      correctAnswer: converted.correctAnswer,
+      assetRefs: converted.assetRefs,
+    };
+  }
+
+  async function importDirect() {
+    if (selectedQuestions.length === 0) return;
+    setImporting(true);
+    try {
+      const inputs = selectedQuestions.map(generatedToInput);
+      const result = await questionsApi.bulkUpload(inputs);
+      alert(`Tạo thành công ${result.inserted} câu hỏi.${result.skipped > 0 ? ` Bỏ qua ${result.skipped} câu trùng.` : ""}`);
+    } catch (e) {
+      alert("Lỗi tạo câu hỏi: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function exportXlsx() {
-    const { rows, skipped } = toBulkRows(selectedQuestions, { grade, week, startSeq });
+    const { rows, skipped } = toBulkRows(selectedQuestions, { grade, week, startSeq, lessonCode: selectedLesson?.code });
     if (rows.length === 0) {
       alert(
         "Không có câu nào xuất được. Chỉ image_choice / audio_choice / missing_letter khớp định dạng 12 cột.",
@@ -244,7 +526,7 @@ export default function AiGeneratePage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Sinh câu hỏi tại chỗ (template + asset auto-map) — <strong>0 token</strong>. Xem trước → chọn
-          → Xuất Excel 12 cột → nạp qua Bulk Import → QA publish.
+          → <strong>Tạo câu hỏi</strong> trực tiếp hoặc Xuất Excel.
         </p>
       </div>
 
@@ -330,15 +612,15 @@ export default function AiGeneratePage() {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Loại câu</Label>
-                <Select value={blueprint} onValueChange={(v) => setBlueprint(v as BlueprintType)}>
+                <Label className="text-xs">Chế độ nhập</Label>
+                <Select value={mode} onValueChange={(v) => setMode(v as InputMode)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {blueprintOptions.map((b) => (
-                      <SelectItem key={b.value} value={b.value}>
-                        {b.label}
+                    {INPUT_MODES.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -372,7 +654,7 @@ export default function AiGeneratePage() {
               <Label className="text-xs">Mã câu bắt đầu (seq)</Label>
               <Input type="number" min={1} value={startSeq} onChange={(e) => setStartSeq(Number(e.target.value))} className="mt-1" />
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Mặc định 101 để tránh đè câu seed cũ. Mã: G{grade}_W{String(week).padStart(2, "0")}_ENG_{String(startSeq).padStart(3, "0")}…
+                Mặc định 101 để tránh đè câu seed cũ. Mã: {selectedLesson?.code ?? `G${grade}_W${String(week).padStart(2, "0")}_ENG`}_{String(startSeq).padStart(3, "0")}…
               </p>
             </div>
 
@@ -414,10 +696,16 @@ export default function AiGeneratePage() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-base">
               <span>Xem trước ({selected.size}/{questions.length} chọn)</span>
-              <Button size="sm" variant="outline" onClick={exportXlsx} disabled={exportableCount === 0}>
-                <Download className="mr-1 h-4 w-4" />
-                Xuất Excel 12 cột
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={importDirect} disabled={selected.size === 0 || importing}>
+                  {importing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Upload className="mr-1 h-4 w-4" />}
+                  Tạo {selected.size} câu hỏi
+                </Button>
+                <Button size="sm" variant="outline" onClick={exportXlsx} disabled={exportableCount === 0}>
+                  <Download className="mr-1 h-4 w-4" />
+                  Xuất Excel
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -492,10 +780,9 @@ export default function AiGeneratePage() {
           <div>
             <div className="font-semibold">Quy trình</div>
             <p className="mt-1">
-              Generate → chọn câu → <strong>Xuất Excel 12 cột</strong> → trang <strong>Bulk Import</strong> →
-              Import (draft) → <strong>QA Queue</strong> duyệt → publish → học sinh thấy trên studyvui.vn.
-              Loại <code className="rounded bg-sky-100 px-1">reorder</code>/
-              <code className="rounded bg-sky-100 px-1">match_word</code> chưa xuất 12 cột (làm đợt sau).
+              Generate → chọn câu → <strong>Tạo câu hỏi</strong> (tạo trực tiếp vào hệ thống, status draft) →
+              <strong>QA Queue</strong> duyệt → publish → học sinh thấy trên studyvui.vn.
+              Hoặc <strong>Xuất Excel</strong> → <strong>Bulk Import</strong> (chỉ hỗ trợ loại trắc nghiệm/chọn ảnh/nghe chọn).
             </p>
           </div>
         </CardContent>

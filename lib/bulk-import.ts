@@ -148,14 +148,25 @@ export function toCreateInput(r: ImportRowResult): CreateQuestionInput | null {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  let content: Record<string, unknown> = { prompt: p.prompt, options };
+  let correctAnswer = options[correctIdx];
+
+  if (p.type === "missing_letter") {
+    const tiles = options;
+    const answer = correctAnswer;
+    const word = p.prompt.replace(/.*—\s*/, "").replace(/\s*_\s*/g, "").trim();
+    content = { prompt: "Điền chữ còn thiếu", tiles, word, prefix: "", suffix: "", blanks: answer.length };
+    correctAnswer = answer;
+  }
+
   return {
     lessonId: r.resolvedLessonId,
     code: p.code,
     type: p.type,
     skill: p.skill,
     difficulty: p.difficulty,
-    content: { prompt: p.prompt, options },
-    correctAnswer: options[correctIdx],
+    content,
+    correctAnswer,
     assetRefs,
   };
 }
