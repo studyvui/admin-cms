@@ -328,14 +328,12 @@ export default function AiGeneratePage() {
       const word = vi.word.toLowerCase();
       const hideCount = word.length <= 2 ? 1 : 2;
 
-      const indices = Array.from({ length: word.length }, (_, idx) => idx);
-      for (let j = indices.length - 1; j > 0; j--) {
-        const k = Math.floor(Math.random() * (j + 1));
-        [indices[j], indices[k]] = [indices[k], indices[j]];
-      }
-      const hiddenIndices = indices.slice(0, hideCount).sort((a, b) => a - b);
+      const startPos = Math.floor(Math.random() * (word.length - hideCount + 1));
+      const hiddenIndices = Array.from({ length: hideCount }, (_, k) => startPos + k);
       const hiddenChars = hiddenIndices.map((idx) => word[idx]);
 
+      const prefix = word.slice(0, startPos);
+      const suffix = word.slice(startPos + hideCount);
       let pattern = "";
       for (let c = 0; c < word.length; c++) {
         pattern += hiddenIndices.includes(c) ? "_" : word[c];
@@ -383,7 +381,7 @@ export default function AiGeneratePage() {
           sentence_words: null,
           correct_order: null,
         },
-        variable_values: { word, grade, week, pattern, hiddenChars, tiles: [...hiddenChars, ...distractorLetters] },
+        variable_values: { word, grade, week, pattern, prefix, suffix, hiddenChars, tiles: [...hiddenChars, ...distractorLetters] },
         distractor_strategy: "mixed",
         template_id: `letter_vocab_${i}`,
         syncStatus: "pending",

@@ -75,9 +75,14 @@ export function generatedToQuestion(q: GeneratedQuestion): Question {
     const pattern = String(q.variable_values.pattern || "");
     const tiles = (q.variable_values.tiles as string[]) ?? options;
 
+    const prefix = String(q.variable_values.prefix ?? "");
+    const suffix = String(q.variable_values.suffix ?? "");
+
     content = {
       prompt: q.components.stem || "Điền chữ còn thiếu",
       word,
+      prefix,
+      suffix,
       pattern,
       blanks: hiddenChars.length,
       tiles,
