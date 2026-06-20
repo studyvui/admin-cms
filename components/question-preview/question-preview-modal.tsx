@@ -90,6 +90,12 @@ export function QuestionPreviewModal({
     pairs?: [string, string][];
     items?: string[];
     numbers?: number[];
+    prefix?: string;
+    suffix?: string;
+    blanks?: number;
+    tiles?: string[];
+    word?: string;
+    pattern?: string;
   };
 
   const imageKeys = q.assetRefs.filter(isImageKey);
@@ -97,7 +103,9 @@ export function QuestionPreviewModal({
   const prompt = content.prompt ?? "";
   const opts = Array.isArray(content.options) ? content.options : [];
   const isInteractive = !NON_INTERACTIVE.has(q.type);
-  const isCorrect = selected === q.correctAnswer;
+  const isCorrect = q.type === "missing_letter"
+    ? q.correctAnswer.toLowerCase().includes(selected?.toLowerCase() ?? "")
+    : selected === q.correctAnswer;
 
   const toggleAudio = (key: string) => {
     if (!audioRef.current) audioRef.current = new Audio();
@@ -187,8 +195,71 @@ export function QuestionPreviewModal({
 
   function renderBody() {
     switch (q.type) {
+      case "missing_letter": {
+        const tiles = content.tiles ?? opts;
+        const pattern = content.pattern ?? "";
+        const word = content.word ?? "";
+        const answer = q.correctAnswer.toLowerCase();
+
+        return (
+          <>
+            <p className="mb-4 text-center text-base font-semibold leading-relaxed">
+              {content.prompt || "Điền chữ còn thiếu"}
+            </p>
+            <ImageGrid keys={imageKeys} />
+            <AudioButtons />
+            <div className="mb-4 flex items-center justify-center gap-1 text-2xl font-bold tracking-widest">
+              {pattern.split("").map((ch, i) => (
+                ch === "_" ? (
+                  <span
+                    key={i}
+                    className={cn(
+                      "inline-flex min-w-[1.4em] items-center justify-center border-b-4 text-center",
+                      checked ? "border-green-500 text-green-600" : "border-indigo-400 text-indigo-300",
+                    )}
+                  >
+                    {checked ? word[i] : "_"}
+                  </span>
+                ) : (
+                  <span key={i} className="min-w-[1.2em] text-center">{ch}</span>
+                )
+              ))}
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              {tiles.map((ch, i) => {
+                const isAnswer = answer.includes(ch);
+                const isSelected = selected === ch;
+                return (
+                  <button
+                    key={i}
+                    disabled={checked}
+                    onClick={() => setSelected(ch)}
+                    className={cn(
+                      "flex h-12 w-12 items-center justify-center rounded-xl border-2 text-lg font-bold transition-all",
+                      !checked && isSelected
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : !checked
+                          ? "border-gray-300 hover:border-blue-400"
+                          : checked && isAnswer
+                            ? "border-green-500 bg-green-50 text-green-700"
+                            : "border-gray-200 text-gray-400 opacity-50",
+                    )}
+                  >
+                    {ch}
+                  </button>
+                );
+              })}
+            </div>
+            {checked && (
+              <p className={cn("mt-3 text-center text-sm font-medium", isCorrect ? "text-green-600" : "text-red-600")}>
+                Đáp án đúng: {answer.split("").join(" → ")} (theo thứ tự)
+              </p>
+            )}
+          </>
+        );
+      }
+
       case "multiple_choice":
-      case "missing_letter":
       case "fill_blank":
         return (
           <>
@@ -261,7 +332,8 @@ export function QuestionPreviewModal({
         );
       }
 
-      case "audio_choice":
+      case "audio_choice": {
+        const audioPerOption = imageKeys.length > 0 && imageKeys.length === opts.length;
         return (
           <>
             {prompt && (
@@ -269,7 +341,7 @@ export function QuestionPreviewModal({
                 {prompt}
               </p>
             )}
-            <ImageGrid keys={imageKeys} />
+            {!audioPerOption && <ImageGrid keys={imageKeys} />}
             {audioKeys.length > 0 && (
               <div className="mb-6 flex justify-center gap-3">
                 {audioKeys.map((k) => (
@@ -290,9 +362,48 @@ export function QuestionPreviewModal({
                 ))}
               </div>
             )}
-            <TextOptions />
+            {audioPerOption ? (
+              <div className="grid grid-cols-2 gap-3">
+                {opts.map((opt, i) => (
+                  <button
+                    key={opt}
+                    disabled={checked}
+                    onClick={() => setSelected(opt)}
+                    className={cn(
+                      "flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all",
+                      selected === opt && !checked
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300",
+                      checked &&
+                        opt === q.correctAnswer &&
+                        "border-green-500 bg-green-50",
+                      checked &&
+                        selected === opt &&
+                        opt !== q.correctAnswer &&
+                        "border-red-500 bg-red-50",
+                      checked && opt !== q.correctAnswer && selected !== opt
+                        ? "opacity-50"
+                        : "",
+                    )}
+                  >
+                    <img
+                      src={assetUrl(imageKeys[i])}
+                      alt={opt}
+                      className="h-20 w-20 object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).alt = `[${opt}]`;
+                      }}
+                    />
+                    <span className="text-sm font-medium">{opt}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <TextOptions />
+            )}
           </>
         );
+      }
 
       case "count_objects":
       case "number_recognition":

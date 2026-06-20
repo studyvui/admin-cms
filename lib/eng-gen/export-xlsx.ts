@@ -48,12 +48,13 @@ export interface ExportOpts {
   grade: number;
   week: number;
   startSeq?: number; // mặc định 101
+  lessonCode?: string;
 }
 
 /** Map danh sách câu đã sinh → các hàng 12 cột (loại bỏ loại không khớp). */
 export function toBulkRows(questions: GeneratedQuestion[], opts: ExportOpts): ExportResult {
   const ww = String(opts.week).padStart(2, "0");
-  const lessonCode = `G${opts.grade}_W${ww}_ENG`;
+  const lessonCode = opts.lessonCode || `G${opts.grade}_W${ww}_ENG`;
   let seq = opts.startSeq ?? 101;
   const rows: BulkRow[] = [];
   const skipped: { id: string; type: string; reason: string }[] = [];
@@ -66,8 +67,14 @@ export function toBulkRows(questions: GeneratedQuestion[], opts: ExportOpts): Ex
     }
     const correctAnswer = String(q.correct_answer || q.components.vocab || "").trim();
     const distractors = (q.components.distractors || []).map((d) => String(d).trim()).filter(Boolean);
-    const optionsRaw = [correctAnswer, ...distractors].filter(Boolean);
-    // Cần đúng 4 đáp án phân biệt
+
+    let optionsRaw: string[];
+    if (type === "missing_letter") {
+      const hiddenChars = (q.variable_values?.hiddenChars as string[] | undefined) ?? correctAnswer.split("");
+      optionsRaw = [...hiddenChars, ...distractors].filter(Boolean);
+    } else {
+      optionsRaw = [correctAnswer, ...distractors].filter(Boolean);
+    }
     const uniq = Array.from(new Set(optionsRaw));
     if (uniq.length < 4) {
       skipped.push({ id: q.id, type, reason: `Thiếu đáp án phân biệt (có ${uniq.length}/4).` });
@@ -88,8 +95,22 @@ export function toBulkRows(questions: GeneratedQuestion[], opts: ExportOpts): Ex
     }
 
     let assetRefs = "";
-    if (type === "image_choice") assetRefs = stripAssetPrefix(q.components.assets.image);
-    else if (type === "audio_choice") assetRefs = stripAssetPrefix(q.components.assets.audio);
+    if (type === "image_choice") {
+      const refs = [stripAssetPrefix(q.components.assets.image)];
+      const audioRef = stripAssetPrefix(q.components.assets.audio);
+      if (audioRef) refs.push(audioRef);
+      assetRefs = refs.filter(Boolean).join(",");
+    } else if (type === "audio_choice") {
+      const refs = [stripAssetPrefix(q.components.assets.audio)];
+      const optImgs = (q.variable_values?.optionImages as string[] | undefined) ?? [];
+      if (optImgs.length > 0) {
+        refs.push(...optImgs.map(stripAssetPrefix));
+      }
+      assetRefs = refs.filter(Boolean).join(",");
+    } else if (type === "missing_letter") {
+      const refs = [stripAssetPrefix(q.components.assets.image), stripAssetPrefix(q.components.assets.audio)];
+      assetRefs = refs.filter(Boolean).join(",");
+    }
 
     const code = `${lessonCode}_${String(seq).padStart(3, "0")}`;
     seq += 1;
