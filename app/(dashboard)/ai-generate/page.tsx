@@ -478,7 +478,7 @@ export default function AiGeneratePage() {
     try {
       const inputs = selectedQuestions.map(generatedToInput);
       const result = await questionsApi.bulkUpload(inputs);
-      alert(`Tạo thành công ${result.inserted} câu hỏi.${result.skipped > 0 ? ` Bỏ qua ${result.skipped} câu trùng.` : ""}`);
+      alert(`Tạo thành công ${result.created} câu hỏi.${result.skipped > 0 ? ` Bỏ qua ${result.skipped} câu trùng (code đã tồn tại).` : ""}`);
     } catch (e) {
       alert("Lỗi tạo câu hỏi: " + (e instanceof Error ? e.message : String(e)));
     } finally {

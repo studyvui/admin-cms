@@ -19,7 +19,7 @@ interface ListQuestionsParams {
 }
 
 interface BulkUploadResult {
-  inserted: number;
+  created: number;
   skipped: number;
   errors: { index: number; message: string }[];
 }
