@@ -34,20 +34,6 @@ const SKILLS: { value: Skill; label: string }[] = [
   { value: "review", label: "Ôn tập" },
 ];
 
-const BLUEPRINTS_BY_SKILL: Record<Skill, { value: BlueprintType; label: string }[]> = {
-  vocabulary: [
-    { value: "image_choice", label: "🖼️ Nhìn hình chọn từ" },
-    { value: "audio_choice", label: "🔊 Nghe chọn từ" },
-    { value: "match_word", label: "🔗 Nối từ" },
-  ],
-  phonics: [{ value: "missing_letter", label: "✏️ Điền chữ thiếu" }],
-  sentence: [{ value: "reorder", label: "🔀 Sắp xếp câu" }],
-  listening: [{ value: "audio_choice", label: "🔊 Nghe chọn đáp án" }],
-  review: [
-    { value: "image_choice", label: "🖼️ Ôn qua hình" },
-    { value: "audio_choice", label: "🔊 Ôn qua âm thanh" },
-  ],
-};
 
 type InputMode = "mc" | "letter" | "audio_choice" | "image_choice";
 
