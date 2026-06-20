@@ -127,7 +127,7 @@ export default function BulkImportPage() {
         .filter((q): q is NonNullable<ReturnType<typeof toCreateInput>> => q !== null);
       try {
         const res = await questionsApi.bulkUpload(payload);
-        inserted += res.inserted ?? 0;
+        inserted += res.created ?? 0;
         skipped += res.skipped ?? 0;
         (res.errors ?? []).forEach((e) => {
           const row = batch[e.index];
