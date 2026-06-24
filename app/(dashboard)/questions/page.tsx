@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, ArrowRight, ImageIcon, Music, X, Trash2, Play } from "lucide-react";
+import { Plus, Pencil, ArrowRight, ImageIcon, Music, X, Trash2, Play, RotateCcw } from "lucide-react";
 import { QuestionPreviewModal } from "@/components/question-preview/question-preview-modal";
 import { lessonsApi } from "@/lib/api/lessons";
 import { coursesApi } from "@/lib/api/courses";
@@ -323,6 +323,19 @@ export default function QuestionsPage() {
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => questionsApi.delete(id),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["questions"] }),
+  });
+
+  // Khôi phục câu "Ngừng dùng" → "Xuất bản" lại (1 nút, tự chạy chuỗi chuyển trạng thái:
+  // deprecated → draft → review → approved → published). Admin mới được (cần quyền publish).
+  const restoreMut = useMutation({
+    mutationFn: async (id: string) => {
+      const chain: QuestionStatus[] = ["draft", "review", "approved", "published"];
+      for (const status of chain) {
+        await questionsApi.changeStatus(id, status);
+      }
+    },
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["questions"] }),
   });
@@ -705,6 +718,20 @@ export default function QuestionsPage() {
                                 {QUESTION_STATUS_LABELS[next] ?? next}
                               </Button>
                             ))}
+                          {/* Khôi phục câu "Ngừng dùng" → "Xuất bản" lại (admin) */}
+                          {canDelete && q.status === "deprecated" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-green-600 hover:text-green-700"
+                              disabled={restoreMut.isPending}
+                              title="Khôi phục và xuất bản lại"
+                              onClick={() => restoreMut.mutate(q.id)}
+                            >
+                              <RotateCcw className="mr-1 h-3 w-3" />
+                              {restoreMut.isPending ? "Đang khôi phục…" : "Khôi phục"}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
