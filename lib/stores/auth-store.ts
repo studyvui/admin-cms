@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "@/lib/types";
+import { clearSessionCookie } from "@/lib/session-cookie";
 
 interface AuthState {
   user: User | null;
@@ -28,7 +29,13 @@ export const useAuthStore = create<AuthState>()(
         set({ user, accessToken, refreshToken }),
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken }),
-      clear: () => set({ user: null, accessToken: null, refreshToken: null }),
+      clear: () => {
+        // Dong bo: mat phien (logout / refresh token het han) phai xoa CA cookie
+        // sv-admin-session, neu khong middleware van cho vao "/" nhung khong co
+        // user -> trang hong (topbar/sidebar trong, ket vong redirect ve "/").
+        clearSessionCookie();
+        set({ user: null, accessToken: null, refreshToken: null });
+      },
       hasRole: (...roles) => {
         const u = get().user;
         return u ? roles.includes(u.role) : false;
