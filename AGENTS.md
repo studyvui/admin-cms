@@ -10,11 +10,13 @@
 | Layer | Library |
 |-------|---------|
 | Data fetching | TanStack Query v5 |
-| State client | Zustand (persisted localStorage) |
+| State client | Zustand v5 (persisted localStorage) |
 | Forms | react-hook-form + zod v4 |
 | HTTP | axios với JWT auto-refresh single-flight interceptor |
-| Excel | SheetJS (xlsx) |
-| Asset upload | @aws-sdk/client-s3 (R2 backend) |
+| Excel | SheetJS (xlsx) — import 12 cột + export bộ sinh đề |
+| Charts | recharts (dashboard / my-stats) |
+| Test | vitest (parity eng-gen + unit math-gen) — `npm test`, hiện 335/335 |
+| Asset upload | Qua backend API (`lib/api/assets.ts` → R2). KHÔNG dùng aws-sdk trong admin-cms |
 | Tables | Plain HTML table (chưa dùng TanStack Table) |
 
 ## Production
@@ -31,32 +33,43 @@ app/
 ├── (auth)/login/page.tsx       # Public login
 ├── (dashboard)/
 │   ├── layout.tsx              # Sidebar + topbar + auth gate
-│   ├── page.tsx                # Dashboard role-aware
+│   ├── page.tsx                # Dashboard role-aware (recharts)
 │   ├── courses/page.tsx        # admin-only CRUD
-│   ├── lessons/page.tsx        # admin-only CRUD (editor ẩn nút)
-│   ├── questions/page.tsx      # CRUD + dual-mode editor (MC + JSON raw)
-│   ├── assets/page.tsx         # Drag-drop R2 upload
+│   ├── lessons/page.tsx        # CRUD bài học (editor ẩn nút) — mã G1_W01_ENG_1
+│   ├── questions/page.tsx      # CRUD + dual-mode editor (MC + JSON) + mode letter/image/audio
+│   ├── assets/page.tsx         # Drag-drop R2 upload (qua backend API)
 │   ├── bulk-import/page.tsx    # Excel 12-col bulk import
 │   ├── qa/queue/page.tsx       # QA approve/reject
 │   ├── qa/audit/page.tsx       # Audit log diff viewer
 │   ├── my-stats/page.tsx       # Editor productivity report
-│   └── ai-generate/page.tsx    # Disabled UI shell (chờ GD10)
-├── not-found.tsx               # 404 custom
+│   ├── ai-generate/page.tsx    # ✅ Sinh đề Tiếng Anh (lib/eng-gen) — ĐÃ HOẠT ĐỘNG
+│   └── ai-generate-math/page.tsx # ✅ Sinh đề Toán (lib/math-gen) — ĐÃ HOẠT ĐỘNG
 └── layout.tsx                  # Root layout
 components/
 ├── ui/                          # shadcn primitives (button, input, dialog, ...)
 ├── asset-picker/                # ImagePicker + AudioPicker dialog
+├── math-template/               # template-editor-modal (ngân hàng mẫu Toán)
+├── question-preview/            # question-preview-modal + math-preview-edit-modal
+├── permission-guard.tsx
 └── shared/                      # sidebar-nav, topbar, status-badge
 lib/
 ├── api-client.ts                # axios + JWT auto-refresh
-├── api/                         # Typed API clients (courses, lessons, questions, assets, qa)
+├── api/                         # Typed API clients (auth, courses, lessons, questions,
+│                                #   assets, qa, question-templates)
 ├── stores/auth-store.ts         # Zustand persisted
-├── bulk-import.ts               # Excel parser + zod validation
+├── session-cookie.ts            # middleware presence flag
+├── bulk-import.ts               # Excel 12-col parser + zod validation
+├── eng-gen/                     # Bộ sinh đề Tiếng Anh (TS port, seeded, parity 313/313)
+├── math-gen/                    # Bộ sinh đề Toán ("ngân hàng mẫu": template+biến+formula)
 ├── types.ts                     # Match Prisma DTOs
 └── errors.ts                    # extractError() helper
 middleware.ts                    # Cookie-based route protection
 hooks/use-auth.ts                # { user, hasRole, logout, hydrated }
 ```
+
+> **Lưu ý route:** sidebar (`components/shared/sidebar-nav.tsx`) có mục `/settings` (admin)
+> nhưng CHƯA có `app/(dashboard)/settings/page.tsx` → click sẽ rơi vào `app/not-found.tsx` (404).
+> Cần thêm page hoặc bỏ khỏi NAV. (`app/not-found.tsx` và `app/providers.tsx` đều đã tồn tại.)
 
 ## Auth flow
 
