@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Calculator,
   Wand2,
@@ -23,15 +22,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { extractError } from "@/lib/errors";
-import { questionTemplatesApi } from "@/lib/api/question-templates";
-import { lessonsApi } from "@/lib/api/lessons";
 import { getBuiltinsForLessonType } from "@/lib/math-gen/builtins";
+import { serverToTemplate } from "@/lib/math-gen/page-helpers";
+import { useMathGen } from "./use-math-gen";
 import { generateBatch } from "@/lib/math-gen/generate";
 import { toBulkRows, downloadBulkXlsx } from "@/lib/math-gen/export-xlsx";
 import { lessonTypeLabel, skillLabel } from "@/lib/math-gen/labels";
 import { TemplateEditorModal } from "@/components/math-template/template-editor-modal";
 import { MathPreviewEditModal } from "@/components/question-preview/math-preview-edit-modal";
-import type { Lesson } from "@/lib/types";
 import type {
   GeneratedMathQuestion,
   MathGenReport,
@@ -42,23 +40,7 @@ import type {
 
 const DIFF_COLOR: Record<number, string> = { 1: "#10b981", 2: "#f59e0b", 3: "#ef4444" };
 
-function serverToTemplate(s: ServerTemplate): MathTemplate {
-  return {
-    id: s.id,
-    source: "user",
-    lessonType: s.lessonType,
-    skill: s.skill,
-    grade: s.grade,
-    text: s.text,
-    formula: s.formula,
-    condition: s.condition ?? undefined,
-    vars: s.vars || [],
-    distractorCount: s.distractorCount || 3,
-  };
-}
-
 export default function AiGenerateMathPage() {
-  const qc = useQueryClient();
   const [grade] = useState(1);
   const [week, setWeek] = useState(1);
   const [count, setCount] = useState(10);
@@ -76,55 +58,29 @@ export default function AiGenerateMathPage() {
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  // ── Bài học Toán theo tuần (nguồn dẫn dắt lessonType + skills) ──
-  const { data: allLessons = [] } = useQuery({
-    queryKey: ["lessons", "all"],
-    queryFn: () => lessonsApi.list({}),
-  });
-  const mathLessonByWeek = useMemo(() => {
-    const m = new Map<number, Lesson>();
-    const re = new RegExp(`^G${grade}_W(\\d+)_MATH$`);
-    for (const l of allLessons) {
-      const mt = re.exec(l.code);
-      if (mt && !m.has(l.week)) m.set(l.week, l);
-    }
-    return m;
-  }, [allLessons, grade]);
-
-  const currentLesson = mathLessonByWeek.get(week) ?? null;
-  const lessonType = currentLesson?.lessonType ?? "";
-  const allowedSkills = currentLesson?.skills ?? [];
+  // Data layer (bài học theo tuần + ngân hàng mẫu + CRUD mẫu) — xem use-math-gen.ts
+  const {
+    currentLesson,
+    lessonType,
+    allowedSkills,
+    userTemplates,
+    isLoading,
+    createMut,
+    updateMut,
+    deleteMut,
+    saving,
+  } = useMathGen({ grade, week });
 
   // ── Templates: built-in + user (backend), lọc theo lessonType của tuần ──
   const builtins = useMemo(
     () => (lessonType ? getBuiltinsForLessonType(lessonType) : []),
     [lessonType],
   );
-  const { data: userTemplates = [], isLoading } = useQuery({
-    queryKey: ["question-templates", lessonType],
-    queryFn: () => questionTemplatesApi.list({ lessonType }),
-    enabled: !!lessonType,
-  });
   const allTemplates: MathTemplate[] = useMemo(
     () => [...builtins, ...userTemplates.map(serverToTemplate)],
     [builtins, userTemplates],
   );
   const selectedTemplate = allTemplates.find((t) => t.id === selectedTplId) || null;
-
-  const createMut = useMutation({
-    mutationFn: (input: TemplateInput) => questionTemplatesApi.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["question-templates"] }),
-  });
-  const updateMut = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<TemplateInput> }) =>
-      questionTemplatesApi.update(id, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["question-templates"] }),
-  });
-  const deleteMut = useMutation({
-    mutationFn: (id: string) => questionTemplatesApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["question-templates"] }),
-  });
-  const saving = createMut.isPending || updateMut.isPending;
 
   const selectedQuestions = useMemo(
     () => questions.filter((_, i) => selectedQ.has(i)),

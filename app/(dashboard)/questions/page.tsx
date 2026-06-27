@@ -368,6 +368,7 @@ export default function QuestionsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              title="Sửa câu hỏi"
                               onClick={() => {
                                 setEditing(q);
                                 setDialogOpen(true);

@@ -1,21 +1,23 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Upload,
-  Trash2,
-  Image as ImageIcon,
-  Music,
   Search,
   Loader2,
   Folder,
-  FolderOpen,
   LayoutList,
   ChevronRight,
 } from "lucide-react";
-import { assetsApi } from "@/lib/api/assets";
-import type { AssetItem, AssetType } from "@/lib/types";
+import { useAssets } from "./use-assets";
+import { FolderGrid } from "./folder-grid";
+import { AssetGrid } from "./asset-grid";
+import {
+  getFolderFromKey,
+  filterAssets,
+  groupByFolder,
+} from "@/lib/assets/asset-list";
+import type { AssetType } from "@/lib/types";
 import { extractError } from "@/lib/errors";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -48,70 +50,27 @@ const COMMON_PREFIXES = [
   "uploads/",
 ];
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-interface PendingFile {
-  id: string;
-  file: File;
-  status: "queued" | "uploading" | "done" | "error";
-  message?: string;
-  result?: AssetItem;
-}
-
-function getFolderFromKey(key: string): string {
-  const lastSlash = key.lastIndexOf("/");
-  if (lastSlash === -1) return "(gốc)";
-  return key.slice(0, lastSlash + 1);
-}
-
 export default function AssetsPage() {
   const { hasRole, hydrated } = useAuth();
-  const queryClient = useQueryClient();
   const [typeFilter, setTypeFilter] = useState<AssetType | "all">("all");
   const [search, setSearch] = useState("");
   const [prefix, setPrefix] = useState("grade1/english/");
-  const [pending, setPending] = useState<PendingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [viewMode, setViewMode] = useState<"flat" | "folder">("flat");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["assets", "all"],
-    queryFn: () => assetsApi.list({}),
-    enabled: hydrated,
-  });
+  // Data layer (list + delete + upload/pending) — xem use-assets.ts
+  const { data, isLoading, error, deleteMut, pending, setPending, handleFiles } =
+    useAssets(hydrated);
 
-  const deleteMut = useMutation({
-    mutationFn: (key: string) => assetsApi.delete(key),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["assets"] }),
-  });
-
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    let items = data;
-    if (typeFilter !== "all") {
-      items = items.filter((a) => a.type === typeFilter);
-    }
-    const q = search.trim().toLowerCase();
-    if (q) items = items.filter((a) => a.key.toLowerCase().includes(q));
-    return items;
-  }, [data, typeFilter, search]);
+  const filtered = useMemo(
+    () => filterAssets(data ?? [], { type: typeFilter, search }),
+    [data, typeFilter, search],
+  );
 
   // folder mode: map folder → assets (from filtered list)
-  const folderMap = useMemo(() => {
-    const map = new Map<string, AssetItem[]>();
-    for (const item of filtered) {
-      const folder = getFolderFromKey(item.key);
-      if (!map.has(folder)) map.set(folder, []);
-      map.get(folder)!.push(item);
-    }
-    const sorted = Array.from(map.entries()).sort(([a], [b]) =>
-      a.localeCompare(b),
-    );
-    return new Map<string, AssetItem[]>(sorted);
-  }, [filtered]);
+  const folderMap = useMemo(() => groupByFolder(filtered), [filtered]);
 
   // assets shown inside a selected folder
   const folderItems = useMemo(
@@ -122,64 +81,15 @@ export default function AssetsPage() {
     [filtered, selectedFolder],
   );
 
-  const handleFiles = useCallback(
-    (files: FileList | File[]) => {
-      const arr = Array.from(files);
-      const next: PendingFile[] = arr.map((f) => ({
-        id: `${f.name}-${f.size}-${Date.now()}-${Math.random()}`,
-        file: f,
-        status:
-          f.size > MAX_FILE_SIZE
-            ? "error"
-            : ("queued" as PendingFile["status"]),
-        message:
-          f.size > MAX_FILE_SIZE
-            ? `File quá lớn (${(f.size / 1024 / 1024).toFixed(1)} MB > 10 MB)`
-            : undefined,
-      }));
-      setPending((prev) => [...prev, ...next]);
-
-      next
-        .filter((p) => p.status === "queued")
-        .forEach((p) => {
-          setPending((prev) =>
-            prev.map((x) =>
-              x.id === p.id ? { ...x, status: "uploading" } : x,
-            ),
-          );
-          assetsApi
-            .upload(p.file, prefix)
-            .then((result) => {
-              setPending((prev) =>
-                prev.map((x) =>
-                  x.id === p.id ? { ...x, status: "done", result } : x,
-                ),
-              );
-              queryClient.invalidateQueries({ queryKey: ["assets"] });
-            })
-            .catch((err) => {
-              setPending((prev) =>
-                prev.map((x) =>
-                  x.id === p.id
-                    ? { ...x, status: "error", message: extractError(err) }
-                    : x,
-                ),
-              );
-            });
-        });
-    },
-    [prefix, queryClient],
-  );
-
   const onDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       setIsDragging(false);
       if (e.dataTransfer.files?.length) {
-        handleFiles(e.dataTransfer.files);
+        handleFiles(e.dataTransfer.files, prefix);
       }
     },
-    [handleFiles],
+    [handleFiles, prefix],
   );
 
   if (!hydrated) return null;
@@ -290,7 +200,7 @@ export default function AssetsPage() {
                 accept="image/*,audio/*"
                 hidden
                 onChange={(e) => {
-                  if (e.target.files?.length) handleFiles(e.target.files);
+                  if (e.target.files?.length) handleFiles(e.target.files, prefix);
                   e.target.value = "";
                 }}
               />
@@ -490,141 +400,4 @@ export default function AssetsPage() {
   );
 }
 
-function FolderGrid({
-  folderMap,
-  onSelectFolder,
-}: {
-  folderMap: Map<string, AssetItem[]>;
-  onSelectFolder: (folder: string) => void;
-}) {
-  if (folderMap.size === 0) {
-    return (
-      <p className="py-12 text-center text-sm text-muted-foreground">
-        Không có folder nào khớp bộ lọc.
-      </p>
-    );
-  }
 
-  return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-      {Array.from(folderMap.entries()).map(([folder, items]) => {
-        const imageCount = items.filter((a: AssetItem) => a.type === "image").length;
-        const audioCount = items.filter((a: AssetItem) => a.type === "audio").length;
-        const previewImage = items.find((a: AssetItem) => a.type === "image");
-
-        return (
-          <button
-            key={folder}
-            type="button"
-            onClick={() => onSelectFolder(folder)}
-            className="group flex flex-col overflow-hidden rounded-lg border bg-card text-left transition hover:border-primary/60 hover:shadow-sm"
-          >
-            {/* Thumbnail strip */}
-            <div className="relative flex h-24 items-center justify-center overflow-hidden bg-muted">
-              {previewImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={previewImage.url}
-                  alt={folder}
-                  className="h-full w-full object-cover opacity-60 transition group-hover:opacity-80"
-                />
-              ) : (
-                <Music className="h-10 w-10 text-muted-foreground/50" />
-              )}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <FolderOpen className="h-10 w-10 text-primary/70 drop-shadow" />
-              </div>
-            </div>
-
-            {/* Info */}
-            <div className="flex flex-col gap-1 p-3">
-              <p
-                className="truncate font-mono text-xs font-medium"
-                title={folder}
-              >
-                {folder}
-              </p>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{items.length} file</span>
-                {imageCount > 0 && (
-                  <span className="flex items-center gap-0.5">
-                    <ImageIcon className="h-3 w-3" />
-                    {imageCount}
-                  </span>
-                )}
-                {audioCount > 0 && (
-                  <span className="flex items-center gap-0.5">
-                    <Music className="h-3 w-3" />
-                    {audioCount}
-                  </span>
-                )}
-              </div>
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function AssetGrid({
-  items,
-  canDelete,
-  onDelete,
-  deleting,
-}: {
-  items: AssetItem[];
-  canDelete: boolean;
-  onDelete: (key: string) => void;
-  deleting: boolean;
-}) {
-  return (
-    <div className="grid grid-cols-3 gap-3 md:grid-cols-4 lg:grid-cols-6">
-      {items.map((a) => (
-        <div
-          key={a.key}
-          className="group relative overflow-hidden rounded-md border"
-        >
-          {a.type === "image" ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={a.url}
-              alt={a.key}
-              loading="lazy"
-              className="aspect-square w-full object-cover bg-muted"
-            />
-          ) : (
-            <div className="flex aspect-square w-full items-center justify-center bg-muted">
-              <Music className="h-10 w-10 text-muted-foreground" />
-            </div>
-          )}
-          <div className="border-t bg-background p-2 text-xs">
-            <p className="truncate font-mono" title={a.key}>
-              {a.key.split("/").pop()}
-            </p>
-            <p className="mt-0.5 flex items-center justify-between text-muted-foreground">
-              <span className="flex items-center gap-1">
-                {a.type === "image" ? (
-                  <ImageIcon className="h-3 w-3" />
-                ) : (
-                  <Music className="h-3 w-3" />
-                )}
-                {(a.size / 1024).toFixed(0)} KB
-              </span>
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(a.key)}
-                  disabled={deleting}
-                  className="text-destructive hover:underline disabled:opacity-50"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              )}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}

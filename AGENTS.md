@@ -71,10 +71,51 @@ hooks/use-auth.ts                # { user, hasRole, logout, hydrated }
 > nhưng CHƯA có `app/(dashboard)/settings/page.tsx` → click sẽ rơi vào `app/not-found.tsx` (404).
 > Cần thêm page hoặc bỏ khỏi NAV. (`app/not-found.tsx` và `app/providers.tsx` đều đã tồn tại.)
 
+## Cấu trúc chuẩn MỌI trang phức tạp (BẮT BUỘC — tối ưu cho Claude Code)
+
+> Trang **questions** là khuôn mẫu (`page.tsx` 439 dòng). Mọi trang lớn/mới PHẢI theo cấu trúc này.
+> Mục tiêu: file nhỏ đơn nhiệm → context rẻ, edit chính xác, test được, dễ phân chia việc.
+
+```
+app/(dashboard)/<page>/
+  page.tsx            # CHỈ orchestration: danh sách, lọc, state mở dialog, render data. KHÔNG logic nghiệp vụ.
+  use-<page>.ts       # data hook: query + mutation (per-entity, KHÔNG generic). Mutation chỉ invalidate;
+                      #   side-effect UI (đóng dialog) ở per-call `.mutate(x, { onSuccess })`.
+  <thing>-dialog.tsx  # form Thêm/Sửa + sub-component lớn tách riêng.
+lib/<page>/
+  <page>-form.ts      # schema zod + transform THUẦN (toPayload/toFormValues/...). Có test.
+  <page>-utils.ts     # helper thuần. Có test.
+  labels.ts           # nhãn/hằng dùng chung page + dialog.
+  __tests__/*.test.ts # vitest (env node) — round-trip/characterization.
+components/            # field/modal DÙNG CHUNG nhiều trang (vd form-fields/asset-field).
+```
+
+**Quy tắc rút gọn:** (1) logic tính toán/validate/transform → `lib/` + test (JSX chỉ render data);
+(2) file ≤ ~500 dòng, 1 file = 1 concern; (3) hook/field khác bản chất **KHÔNG gộp** (tránh trừu tượng sai);
+(4) icon-button phải có `title`/`aria-label` (testable = accessible).
+
+## Quy ước TEST (BẮT BUỘC — 2 tầng)
+
+| Tầng | Công cụ | Phủ gì | Lệnh |
+|------|---------|--------|------|
+| Logic thuần | **vitest** (env `node`, `lib/**/*.test.ts`) | transform/validate/buildCode/payload | `npm test` |
+| Luồng UI thật | **Playwright** (`e2e/`, trình duyệt thật + mock) | render/RHF/mode/payload/permission | `npm run test:e2e` |
+
+- **KHÔNG dùng jsdom** (flaky với Radix portal). UI test = Playwright.
+- E2E helper có sẵn: `e2e/helpers/auth.ts` (`loginAs(context, role)` — seed Zustand `studyvui-admin-auth`
+  + cookie `sv-admin-session`, bypass login) + `e2e/helpers/mock-api.ts` (`ApiMock`: chặn `**/api/v1/**`,
+  trả fixture GET, **capture body** POST/PATCH/DELETE để assert payload). **KHÔNG gọi backend thật / ghi prod.**
+- Mẫu: `e2e/questions.spec.ts`. Mỗi lần refactor 1 trang: viết/giữ `e2e/<page>.spec.ts` **xanh trước+sau**
+  (bằng chứng không đổi hành vi).
+- Selector ổn định: `getByRole`/`getByLabel`/`getByText`. Mode-select có `aria-label`; emoji trong help text
+  là marker phân biệt mode tiện assert.
+- **Cổng đầy đủ trước khi commit:** `npm test` + `npx tsc --noEmit` + `npm run build` + `npx next lint` +
+  `npm run test:e2e` — tất cả xanh.
+
 ## Auth flow
 
 1. Login form → POST `/auth/login` → nhận `{ accessToken, refreshToken, user }`
-2. Lưu vào Zustand store (auto-persist localStorage key `sv-admin-auth`)
+2. Lưu vào Zustand store (auto-persist localStorage key `studyvui-admin-auth`)
 3. Set cookie `sv-admin-session=1` để middleware biết user đã login
 4. axios interceptor auto gắn `Authorization: Bearer <accessToken>`
 5. Token expire → interceptor tự gọi `/auth/refresh`, single-flight (chỉ 1 refresh dù 10 request fail cùng lúc)
