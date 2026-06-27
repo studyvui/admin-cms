@@ -29,6 +29,24 @@ export const LESSON = {
 export const COURSES = [COURSE];
 export const LESSONS = [LESSON];
 
+// Bài học Toán cho trang AI Sinh đề Toán (lessonType "calculation" có built-in qua nhóm "addition").
+export const MATH_LESSON = {
+  id: "44444444-4444-4444-8444-444444444444",
+  courseId: "55555555-5555-4555-8555-555555555555",
+  code: "G1_W01_MATH",
+  week: 1,
+  orderIndex: 1,
+  name: "Phép cộng trong 10",
+  lessonType: "calculation",
+  skills: ["calculation"],
+  status: "published",
+  isPremium: false,
+  vocabulary: [],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+};
+export const MATH_LESSONS = [MATH_LESSON];
+
 interface FQuestion {
   id: string;
   lessonId: string;
