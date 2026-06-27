@@ -47,6 +47,22 @@ export const MATH_LESSON = {
 };
 export const MATH_LESSONS = [MATH_LESSON];
 
+// Asset (R2) cho trang Kho asset.
+function asset(key: string, type: "image" | "audio", size: number) {
+  return {
+    key,
+    url: `https://cdn.studyvui.vn/${key}`,
+    size,
+    lastModified: "2026-01-01T00:00:00Z",
+    type,
+  };
+}
+export const ASSETS = [
+  asset("grade1/english/cat.png", "image", 12345),
+  asset("grade1/english/dog.png", "image", 23456),
+  asset("audio/grade1/english/cat.mp3", "audio", 34567),
+];
+
 interface FQuestion {
   id: string;
   lessonId: string;
