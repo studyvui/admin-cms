@@ -325,7 +325,7 @@ export function QuestionDialog({
                 })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label="Chế độ nhập">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
