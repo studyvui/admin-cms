@@ -1,18 +1,24 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Plus, Pencil, ArrowRight, Trash2, X, ImageIcon, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { coursesApi } from "@/lib/api/courses";
-import { lessonsApi } from "@/lib/api/lessons";
 import { assetsApi } from "@/lib/api/assets";
+import { useLessons } from "./use-lessons";
+import {
+  lessonSchema,
+  buildCode,
+  toCreateInput,
+  toFormValues,
+  defaultFormValues,
+  type LessonFormValues,
+} from "@/lib/lessons/lesson-form";
 import { ImagePicker } from "@/components/asset-picker/image-picker";
 import { AudioPicker } from "@/components/asset-picker/audio-picker";
-import type { Course, Lesson, LessonStatus, VocabItem } from "@/lib/types";
+import type { Course, Lesson, LessonStatus } from "@/lib/types";
 import { extractError } from "@/lib/errors";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -134,32 +140,8 @@ const STATUS_FLOW: Record<LessonStatus, LessonStatus[]> = {
 // useEffect([open, initialSelected]) doesn't loop on the default `[]` (React #185)
 const EMPTY_KEYS: string[] = [];
 
-const vocabItemSchema = z.object({
-  word: z.string().min(1, "Bắt buộc"),
-  meaning: z.string().optional(),
-  imageUrl: z.string().optional(),
-  audioUrl: z.string().optional(),
-});
-
-const lessonSchema = z.object({
-  courseId: z.string().uuid("Chọn khoá học"),
-  code: z
-    .string()
-    .min(3, "Tối thiểu 3 ký tự")
-    .regex(/^[A-Z0-9_]+$/, "Chỉ chữ HOA, số, dấu gạch dưới"),
-  week: z.number().int().min(1).max(40),
-  orderIndex: z.number().int().min(1).max(100),
-  name: z.string().min(1, "Bắt buộc"),
-  lessonType: z.string().min(1, "Bắt buộc"),
-  skillsCsv: z.string().min(1, "Ít nhất 1 skill"),
-  vocabulary: z.array(vocabItemSchema),
-});
-
-type LessonFormValues = z.infer<typeof lessonSchema>;
-
 export default function LessonsPage() {
   const { hasRole, hydrated } = useAuth();
-  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<{
     courseId?: string;
     status?: LessonStatus;
@@ -168,61 +150,16 @@ export default function LessonsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Lesson | null>(null);
 
-  const { data: courses } = useQuery({
-    queryKey: ["courses"],
-    queryFn: coursesApi.list,
-  });
-
-  const { data: lessons, isLoading, error } = useQuery({
-    queryKey: ["lessons", filters],
-    queryFn: () =>
-      lessonsApi.list({
-        courseId: filters.courseId,
-        status: filters.status,
-        week: filters.week ? parseInt(filters.week, 10) : undefined,
-      }),
-  });
-
-  const createMut = useMutation({
-    mutationFn: lessonsApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lessons"] });
-      setDialogOpen(false);
-    },
-  });
-
-  const updateMut = useMutation({
-    mutationFn: (input: { id: string; values: LessonFormValues }) =>
-      lessonsApi.update(input.id, {
-        name: input.values.name,
-        lessonType: input.values.lessonType,
-        skills: input.values.skillsCsv
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        week: input.values.week,
-        orderIndex: input.values.orderIndex,
-        vocabulary: input.values.vocabulary?.length ? input.values.vocabulary : undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lessons"] });
-      setDialogOpen(false);
-      setEditing(null);
-    },
-  });
-
-  const statusMut = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: LessonStatus }) =>
-      lessonsApi.changeStatus(id, status),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["lessons"] }),
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: (id: string) => lessonsApi.delete(id),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["lessons"] }),
-  });
+  const {
+    courses,
+    lessons,
+    isLoading,
+    error,
+    createMut,
+    updateMut,
+    statusMut,
+    deleteMut,
+  } = useLessons(filters);
 
   if (!hydrated) return null;
   if (!hasRole("admin", "editor", "qa")) {
@@ -238,22 +175,19 @@ export default function LessonsPage() {
   const canDelete = hasRole("admin");
 
   const onSubmit = (values: LessonFormValues) => {
-    const skills = values.skillsCsv
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
     if (editing) {
-      updateMut.mutate({ id: editing.id, values });
+      updateMut.mutate(
+        { id: editing.id, values },
+        {
+          onSuccess: () => {
+            setDialogOpen(false);
+            setEditing(null);
+          },
+        },
+      );
     } else {
-      createMut.mutate({
-        courseId: values.courseId,
-        code: values.code,
-        week: values.week,
-        orderIndex: values.orderIndex,
-        name: values.name,
-        lessonType: values.lessonType,
-        skills,
-        vocabulary: values.vocabulary?.length ? values.vocabulary : undefined,
+      createMut.mutate(toCreateInput(values), {
+        onSuccess: () => setDialogOpen(false),
       });
     }
   };
@@ -500,25 +434,6 @@ export default function LessonsPage() {
   );
 }
 
-const SUBJECT_CODE: Record<string, string> = { english: "ENG", math: "MATH" };
-
-function buildCode(
-  courses: Course[],
-  courseId: string,
-  week: number,
-  orderIndex: number,
-): string {
-  const course = courses.find((c) => c.id === courseId);
-  if (!course || !week || week < 1) return "";
-  const w = String(week).padStart(2, "0");
-  const sub = SUBJECT_CODE[course.subject] ?? course.subject.toUpperCase();
-  // Model "bai con": moi tuan tach nhieu bai nho. Thu tu dat TRUOC mon de tranh
-  // nhap nhang voi ma cau hoi (vd ma bai G1_W01_1_ENG -> cau hoi G1_W01_1_ENG_001).
-  // Lesson cu trong DB giu ma bare khong doi.
-  const order = orderIndex >= 1 ? orderIndex : 1;
-  return `G${course.grade}_W${w}_${order}_${sub}`;
-}
-
 function LessonDialog({
   open,
   onOpenChange,
@@ -538,27 +453,7 @@ function LessonDialog({
 }) {
   const defaults = useMemo<LessonFormValues>(
     () =>
-      editing
-        ? {
-            courseId: editing.courseId,
-            code: editing.code,
-            week: editing.week,
-            orderIndex: editing.orderIndex,
-            name: editing.name,
-            lessonType: editing.lessonType,
-            skillsCsv: editing.skills.join(", "),
-            vocabulary: (editing.vocabulary ?? []) as VocabItem[],
-          }
-        : {
-            courseId: courses[0]?.id ?? "",
-            code: "",
-            week: 1,
-            orderIndex: 1,
-            name: "",
-            lessonType: "vocabulary",
-            skillsCsv: "vocab, listening",
-            vocabulary: [],
-          },
+      editing ? toFormValues(editing) : defaultFormValues(courses[0]?.id ?? ""),
     [editing, courses],
   );
 
