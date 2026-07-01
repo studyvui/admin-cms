@@ -145,17 +145,17 @@ describe("toFormValues ↔ toPayload — round-trip ổn định", () => {
     expect(p.correctAnswer).toBe("dog");
   });
 
-  it("mode json (content tuỳ ý, không phải 4-option)", () => {
+  it("mode json (content tuỳ ý, loại chưa có mode riêng → JSON passthrough)", () => {
     const q: Question = applyPayload(baseQ, {
-      type: "reorder",
+      type: "matching", // loại chưa có form mode riêng → về mode json
       skill: "vocab",
       difficulty: 3,
-      content: { prompt: "Sắp xếp", tokens: ["I", "am", "happy"] },
+      content: { prompt: "Nối từ", tokens: ["I", "am", "happy"] },
       correctAnswer: "I am happy",
       assetRefs: [],
     });
     const p = expectStableRoundTrip(q);
-    expect(p.type).toBe("reorder");
+    expect(p.type).toBe("matching");
     expect(p.correctAnswer).toBe("I am happy");
     expect((p.content as { tokens: string[] }).tokens).toEqual([
       "I",
@@ -202,6 +202,57 @@ describe("toFormValues ↔ toPayload — round-trip ổn định", () => {
     expect(c.tiles).toContain("e");
     expect(c.tiles).toContain("l");
     expect(c.tiles.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("mode reorder (Câu sắp xếp)", () => {
+  it("toPayload: câu đúng → content {items, correct_order} + type reorder", () => {
+    const p = toPayload(
+      {
+        mode: "reorder",
+        lessonId: "11111111-1111-4111-8111-111111111111",
+        code: "G1_W03_5_ENG_001",
+        type: "reorder",
+        skill: "sentence",
+        difficulty: 1,
+        assetRefsCsv: "",
+        prompt: "",
+        sentence: "It is a pen",
+      },
+      mulberry32(7),
+    );
+    expect(p.type).toBe("reorder");
+    expect(p.correctAnswer).toBe("It is a pen");
+    const c = p.content as { correct_order: string[]; items: string[]; prompt: string };
+    expect(c.correct_order).toEqual(["It", "is", "a", "pen"]);
+    expect([...c.items].sort()).toEqual([...c.correct_order].sort());
+    expect(c.prompt).toBe("Sắp xếp các từ thành câu đúng");
+  });
+
+  it("schema từ chối câu < 2 từ", () => {
+    const bad = questionFormSchema.safeParse({
+      mode: "reorder",
+      lessonId: "11111111-1111-4111-8111-111111111111",
+      code: "G1_W03_5_ENG_001",
+      type: "reorder",
+      skill: "sentence",
+      difficulty: 1,
+      sentence: "pen",
+    });
+    expect(bad.success).toBe(false);
+  });
+
+  it("round-trip ổn định (reorder)", () => {
+    const q: Question = applyPayload(baseQ, {
+      type: "reorder",
+      skill: "sentence",
+      difficulty: 1,
+      content: { prompt: "Sắp xếp các từ thành câu đúng", items: ["pen", "a", "is", "It"], correct_order: ["It", "is", "a", "pen"] },
+      correctAnswer: "It is a pen",
+      assetRefs: [],
+    });
+    const p = expectStableRoundTrip(q);
+    expect((p.content as { correct_order: string[] }).correct_order).toEqual(["It", "is", "a", "pen"]);
   });
 });
 

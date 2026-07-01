@@ -94,12 +94,25 @@ const letterSchema = baseSchema.extend({
     }),
 });
 
+// "Câu (sắp xếp)": gõ CẢ CÂU đúng (≥ 2 từ); hệ thống tự xáo trộn thành thẻ từ cho học sinh xếp lại.
+const reorderSchema = baseSchema.extend({
+  mode: z.literal("reorder"),
+  prompt: z.string().optional(),
+  sentence: z
+    .string()
+    .min(1, "Nhập câu đúng")
+    .refine((v) => v.trim().split(/\s+/).filter(Boolean).length >= 2, {
+      message: "Câu cần ít nhất 2 từ",
+    }),
+});
+
 export const questionFormSchema = z.discriminatedUnion("mode", [
   mcSchema,
   audioChoiceSchema,
   imageChoiceSchema,
   jsonSchema,
   letterSchema,
+  reorderSchema,
 ]);
 
 export type QuestionFormValues = z.infer<typeof questionFormSchema>;
@@ -222,6 +235,17 @@ export function toPayload(
     };
     correctAnswer = parsed.hidden.toLowerCase();
     finalType = "missing_letter"; // ép loại, bỏ qua dropdown
+  } else if (values.mode === "reorder") {
+    // "Câu (sắp xếp)": tách câu đúng thành từ, xáo trộn thành thẻ (items) cho học sinh xếp lại.
+    const correct_order = values.sentence.trim().split(/\s+/).filter(Boolean);
+    const items = shuffleArr(correct_order.slice(), rng);
+    content = {
+      prompt: (values.prompt ?? "").trim() || "Sắp xếp các từ thành câu đúng",
+      items,
+      correct_order,
+    };
+    correctAnswer = correct_order.join(" ");
+    finalType = "reorder"; // ép loại
   } else {
     content = JSON.parse(values.contentJson);
     correctAnswer = values.correctAnswer;
@@ -339,6 +363,25 @@ export function toFormValues(editing: Question): QuestionFormValues {
         | "B"
         | "C"
         | "D",
+    };
+  }
+
+  // "Câu (sắp xếp)" (reorder): content có correct_order → dựng lại câu đúng.
+  if (editing.type === "reorder") {
+    const cr = editing.content as { prompt?: string; correct_order?: unknown };
+    const order = Array.isArray(cr.correct_order)
+      ? (cr.correct_order as string[])
+      : String(editing.correctAnswer).trim().split(/\s+/).filter(Boolean);
+    return {
+      mode: "reorder",
+      lessonId: editing.lessonId,
+      code: editing.code,
+      type: editing.type,
+      skill: editing.skill,
+      difficulty: editing.difficulty,
+      assetRefsCsv: editing.assetRefs.join(", "),
+      prompt: cr.prompt ?? "",
+      sentence: order.join(" "),
     };
   }
 

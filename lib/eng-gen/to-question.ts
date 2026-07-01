@@ -69,6 +69,20 @@ export function generatedToQuestion(q: GeneratedQuestion): Question {
 
   let content: Record<string, unknown> = { prompt: displayPrompt(q), options };
 
+  if (q.blueprintType === "reorder") {
+    // Reorder: giữ đủ mảng từ xáo + thứ tự đúng để preview/frontend render (KHÔNG dùng model 4-option).
+    const correctOrder =
+      (q.render_spec?.correct_order as string[] | undefined) ??
+      String(q.correct_answer || "").trim().split(/\s+/).filter(Boolean);
+    const items =
+      (q.render_spec?.sentence_words as string[] | undefined) ?? correctOrder;
+    content = {
+      prompt: q.components.stem || "Sắp xếp các từ thành câu đúng",
+      items,
+      correct_order: correctOrder,
+    };
+  }
+
   if (q.blueprintType === "missing_letter" && q.variable_values) {
     const word = String(q.components.vocab || "");
     const hiddenChars = (q.variable_values.hiddenChars as string[]) ?? [];

@@ -63,5 +63,6 @@ export const MODE_LABELS: Record<string, string> = {
   letter: "Điền chữ còn thiếu (kéo thẻ chữ)",
   audio_choice: "Nghe rồi chọn ảnh",
   image_choice: "Ảnh rồi chọn từ",
+  reorder: "Câu (sắp xếp)",
   json: "JSON raw (nâng cao)",
 };
