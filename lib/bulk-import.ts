@@ -45,7 +45,9 @@ const QUESTION_TYPES = [
   "compare_numbers",
 ];
 
-export const rowSchema = z.object({
+// Base: optionB/C/D + correct nới lỏng (mặc định "") để dạng `reorder` chỉ cần optionA = cả câu.
+// Ràng buộc chặt cho các loại 4-đáp-án được đưa xuống .refine (theo type) bên dưới.
+const baseRowShape = z.object({
   lessonCode: z.string().min(1, "Mã bài học bắt buộc"),
   code: z
     .string()
@@ -58,14 +60,29 @@ export const rowSchema = z.object({
   difficulty: z.coerce.number().int().min(1, "1-5").max(5, "1-5"),
   prompt: z.string().min(1, "Đề bài bắt buộc"),
   optionA: z.string().min(1, "Lựa chọn A bắt buộc"),
-  optionB: z.string().min(1, "Lựa chọn B bắt buộc"),
-  optionC: z.string().min(1, "Lựa chọn C bắt buộc"),
-  optionD: z.string().min(1, "Lựa chọn D bắt buộc"),
-  correct: z.enum(["A", "B", "C", "D"], {
-    message: "Đáp án phải là A, B, C hoặc D",
-  }),
+  optionB: z.string().optional().default(""),
+  optionC: z.string().optional().default(""),
+  optionD: z.string().optional().default(""),
+  correct: z.string().optional().default("A"),
   assetRefs: z.string().optional(),
 });
+
+export const rowSchema = baseRowShape
+  // reorder: optionA = cả câu đúng (≥ 2 từ). B/C/D/correct bỏ trống được.
+  .refine(
+    (v) => v.type !== "reorder" || v.optionA.trim().split(/\s+/).filter(Boolean).length >= 2,
+    { message: "Câu sắp xếp cần ≥ 2 từ (đặt cả câu đúng vào Lựa chọn A)", path: ["optionA"] },
+  )
+  // các loại 4-đáp-án: B/C/D bắt buộc.
+  .refine(
+    (v) => v.type === "reorder" || (!!v.optionB.trim() && !!v.optionC.trim() && !!v.optionD.trim()),
+    { message: "Lựa chọn B/C/D bắt buộc", path: ["optionB"] },
+  )
+  // các loại 4-đáp-án: correct ∈ A/B/C/D.
+  .refine(
+    (v) => v.type === "reorder" || ["A", "B", "C", "D"].includes(v.correct),
+    { message: "Đáp án phải là A, B, C hoặc D", path: ["correct"] },
+  );
 
 export type ParsedRow = z.infer<typeof rowSchema>;
 
@@ -139,6 +156,26 @@ export function validateRows(
   });
 }
 
+// Xáo mảng ỔN ĐỊNH theo seed chuỗi (djb2 → mulberry32) — cùng code luôn ra cùng thứ tự (test được).
+// Nếu xáo trùng thứ tự đúng (câu ≥ 2 từ) thì xoay 1 để đảm bảo khác.
+export function shuffleStable<T>(arr: T[], seedStr: string): T[] {
+  let h = 5381;
+  for (let i = 0; i < seedStr.length; i++) h = ((h << 5) + h + seedStr.charCodeAt(i)) >>> 0;
+  const rng = () => {
+    h = (h + 0x6d2b79f5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  if (out.length > 1 && out.every((v, i) => v === arr[i])) out.push(out.shift() as T);
+  return out;
+}
+
 export function toCreateInput(r: ImportRowResult): CreateQuestionInput | null {
   if (r.status !== "valid" || !r.parsed || !r.resolvedLessonId) return null;
   const p = r.parsed;
@@ -150,6 +187,24 @@ export function toCreateInput(r: ImportRowResult): CreateQuestionInput | null {
     .filter(Boolean);
   let content: Record<string, unknown> = { prompt: p.prompt, options };
   let correctAnswer = options[correctIdx];
+
+  if (p.type === "reorder") {
+    // Quy ước: optionA = cả câu đúng. Suy ra thứ tự đúng + mảng từ đã xáo (xáo ổn định theo code).
+    const correct_order = p.optionA.trim().split(/\s+/).filter(Boolean);
+    const items = shuffleStable(correct_order, p.code);
+    content = { prompt: p.prompt, items, correct_order };
+    correctAnswer = correct_order.join(" ");
+    return {
+      lessonId: r.resolvedLessonId,
+      code: p.code,
+      type: p.type,
+      skill: p.skill,
+      difficulty: p.difficulty,
+      content,
+      correctAnswer,
+      assetRefs,
+    };
+  }
 
   if (p.type === "missing_letter") {
     const tiles = options;

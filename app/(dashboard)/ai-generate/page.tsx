@@ -57,7 +57,7 @@ const MODE_TO_BLUEPRINT: Record<InputMode, BlueprintType> = {
   image_choice: "image_choice",
 };
 
-const EXPORTABLE = new Set(["image_choice", "audio_choice", "missing_letter", "multiple_choice"]);
+const EXPORTABLE = new Set(["image_choice", "audio_choice", "missing_letter", "multiple_choice", "reorder"]);
 const DIFF_COLOR: Record<number, string> = { 1: "#10b981", 2: "#f59e0b", 3: "#ef4444" };
 
 // Mapping DB skill keys → generator Skill type (case-insensitive lookup)
@@ -289,7 +289,7 @@ export default function AiGeneratePage() {
     const { rows, skipped } = toBulkRows(selectedQuestions, { grade, week, startSeq, lessonCode: selectedLesson?.code });
     if (rows.length === 0) {
       alert(
-        "Không có câu nào xuất được. Chỉ image_choice / audio_choice / missing_letter khớp định dạng 12 cột.",
+        "Không có câu nào xuất được. Chỉ image_choice / audio_choice / missing_letter / reorder khớp định dạng 12 cột.",
       );
       return;
     }

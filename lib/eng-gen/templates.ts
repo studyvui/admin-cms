@@ -94,14 +94,14 @@ const RAW_TEMPLATES: RawTemplate[] = [
     template_id: "sentence_reorder_l1", skill: "sentence", blueprint_type: "reorder",
     difficulty_range: [1, 1], distractor_strategy: "mixed", required_assets: [], complexity_hint: 1,
     answer_formula: "ordered_sentence",
-    sentence_pool: ["I am happy", "She is tall", "He can run", "I like cats", "It is red", "We are here", "I see you", "She has books", "He is big", "I love dogs", "She can sing", "He eats rice", "I am good", "We play ball", "It is hot"],
+    sentence_pool: ["I am happy", "She is tall", "He can run", "I like cats", "It is red", "We are here", "I see you", "She has books", "He is big", "I love dogs", "She can sing", "He eats rice", "I am good", "We play ball", "It is hot", "What is this", "I am six", "Let's jump", "Yes I do"],
     question_text_pool: ["Put the words in order.", "Make a sentence.", "Arrange the words.", "Fix the sentence.", "Put the words in the correct order.", "Arrange the words to make a sentence.", "Order the words correctly."],
   },
   {
     template_id: "sentence_reorder_l2", skill: "sentence", blueprint_type: "reorder",
     difficulty_range: [2, 2], distractor_strategy: "mixed", required_assets: [], complexity_hint: 2,
     answer_formula: "ordered_sentence",
-    sentence_pool: ["The cat is big", "I like apples", "He can run fast", "We go to school", "My dog is cute", "I see a bird", "They play games", "The sun is hot", "She has a book", "He is very tall", "I have two cats", "She likes to read", "We eat lunch now", "He plays with toys", "I am at home"],
+    sentence_pool: ["The cat is big", "I like apples", "He can run fast", "We go to school", "My dog is cute", "I see a bird", "They play games", "The sun is hot", "She has a book", "He is very tall", "I have two cats", "She likes to read", "We eat lunch now", "He plays with toys", "I am at home", "It is a pen", "It is a book", "How old are you", "Do you like pizza"],
     question_text_pool: ["Put the words in order.", "Arrange the words to make a sentence.", "Fix the sentence.", "Make a correct sentence.", "Put the words in the right order.", "Order the words to form a sentence.", "Rearrange the words correctly."],
   },
   // listening_audio_choice L1-L2
