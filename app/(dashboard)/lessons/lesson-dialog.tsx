@@ -17,7 +17,7 @@ import {
   defaultFormValues,
   type LessonFormValues,
 } from "@/lib/lessons/lesson-form";
-import { LESSON_TYPE_OPTIONS } from "@/lib/lessons/labels";
+import { lessonTypeOptionsForSubject } from "@/lib/lessons/labels";
 import { SkillPicker } from "./skill-picker";
 import type { Course, Lesson } from "@/lib/types";
 import { ImagePicker } from "@/components/asset-picker/image-picker";
@@ -87,6 +87,10 @@ export function LessonDialog({
 
   const selectedCourse = courses.find((c) => c.id === watchedCourseId);
   const isEnglishCourse = selectedCourse?.subject === "english";
+  const lessonTypeOptions = useMemo(
+    () => lessonTypeOptionsForSubject(selectedCourse?.subject),
+    [selectedCourse?.subject],
+  );
 
   const { fields: vocabFields, append: appendVocab, remove: removeVocab } = useFieldArray({
     control,
@@ -141,11 +145,18 @@ export function LessonDialog({
     }
   }, [editing, watchedCourseId, watchedWeek, watchedOrderIndex, courses, setValue]);
 
-  // Khi chuyển sang khoá học Tiếng Anh → tự động chọn loại & kỹ năng phù hợp
+  // Khi đổi môn (Toán ↔ Tiếng Anh) → nếu loại bài học hiện tại không thuộc môn đó,
+  // reset loại + kỹ năng về mặc định phù hợp. Tránh dropdown trống khi loại/kỹ năng lệch môn.
   useEffect(() => {
-    if (!editing && isEnglishCourse) {
+    if (editing) return;
+    const validTypes = new Set(lessonTypeOptions.map((o) => o.value));
+    if (validTypes.has(watch("lessonType"))) return;
+    if (isEnglishCourse) {
       setValue("lessonType", "vocabulary", { shouldValidate: false });
       setValue("skillsCsv", "vocab, listening", { shouldValidate: false });
+    } else {
+      setValue("lessonType", "counting", { shouldValidate: false });
+      setValue("skillsCsv", "counting", { shouldValidate: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEnglishCourse]);
@@ -268,7 +279,7 @@ export function LessonDialog({
                     <SelectValue placeholder="Chọn loại bài học..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {LESSON_TYPE_OPTIONS.map((opt) => (
+                    {lessonTypeOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </SelectItem>
@@ -291,7 +302,11 @@ export function LessonDialog({
               name="skillsCsv"
               control={control}
               render={({ field }) => (
-                <SkillPicker value={field.value} onChange={field.onChange} />
+                <SkillPicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  subject={selectedCourse?.subject}
+                />
               )}
             />
             {errors.skillsCsv && (
