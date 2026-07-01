@@ -3,7 +3,8 @@
 
 import type { LessonStatus } from "@/lib/types";
 
-export const LESSON_TYPE_LABELS: Record<string, string> = {
+// Loại bài học của MÔN TOÁN
+export const MATH_LESSON_TYPE_LABELS: Record<string, string> = {
   // Số học
   counting:          "Đếm số",
   compare_quantity:  "So sánh số lượng qua hình",
@@ -26,7 +27,10 @@ export const LESSON_TYPE_LABELS: Record<string, string> = {
   classify_3d:       "Phân loại hình khối 3D",
   spatial_orientation: "Vị trí không gian",
   geometry:          "Hình học tổng quát",
-  // Tiếng Anh
+};
+
+// Loại bài học của MÔN TIẾNG ANH
+export const ENGLISH_LESSON_TYPE_LABELS: Record<string, string> = {
   vocabulary:        "Từ vựng",
   phonics:           "Phonics",
   image_choice:      "Chọn hình",
@@ -34,16 +38,27 @@ export const LESSON_TYPE_LABELS: Record<string, string> = {
   audio_choice:      "Nghe và chọn",
   reorder:           "Sắp xếp câu",
   match_word:        "Nối từ",
-  // Đặc biệt
+};
+
+// Dùng chung cho cả 2 môn
+export const SPECIAL_LESSON_TYPE_LABELS: Record<string, string> = {
   review:            "Ôn tập",
   boss:              "Boss Challenge",
+};
+
+// Bảng gộp — CHỈ dùng để tra nhãn (page hiển thị). KHÔNG dùng để render dropdown.
+export const LESSON_TYPE_LABELS: Record<string, string> = {
+  ...MATH_LESSON_TYPE_LABELS,
+  ...ENGLISH_LESSON_TYPE_LABELS,
+  ...SPECIAL_LESSON_TYPE_LABELS,
 };
 
 export const LESSON_TYPE_OPTIONS = Object.entries(LESSON_TYPE_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
 
-export const SKILL_LABELS: Record<string, string> = {
+// Kỹ năng MÔN TOÁN
+export const MATH_SKILL_LABELS: Record<string, string> = {
   counting:            "Đếm số",
   number_recognition:  "Nhận diện số",
   sequence:            "Dãy số",
@@ -61,10 +76,39 @@ export const SKILL_LABELS: Record<string, string> = {
   word_problem:        "Lời văn",
   geometry:            "Hình học",
   calculation:         "Tính toán",
+};
+
+// Kỹ năng MÔN TIẾNG ANH
+export const ENGLISH_SKILL_LABELS: Record<string, string> = {
   vocab:               "Từ vựng",
   listening:           "Nghe",
   phonics:             "Phonics",
+  reading:             "Đọc hiểu",
+  sentence:            "Mẫu câu",
 };
+
+// Bảng gộp — CHỈ dùng để tra nhãn (page hiển thị). KHÔNG dùng để render picker.
+export const SKILL_LABELS: Record<string, string> = {
+  ...MATH_SKILL_LABELS,
+  ...ENGLISH_SKILL_LABELS,
+};
+
+// Lọc theo môn cho dropdown/picker trong dialog bài học.
+export function lessonTypeOptionsForSubject(
+  subject?: string,
+): { value: string; label: string }[] {
+  const base =
+    subject === "english"
+      ? ENGLISH_LESSON_TYPE_LABELS
+      : MATH_LESSON_TYPE_LABELS;
+  return Object.entries({ ...base, ...SPECIAL_LESSON_TYPE_LABELS }).map(
+    ([value, label]) => ({ value, label }),
+  );
+}
+
+export function skillLabelsForSubject(subject?: string): Record<string, string> {
+  return subject === "english" ? ENGLISH_SKILL_LABELS : MATH_SKILL_LABELS;
+}
 
 export const STATUS_LABELS: Record<LessonStatus, string> = {
   draft:    "Nháp",
