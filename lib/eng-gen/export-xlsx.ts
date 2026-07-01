@@ -8,8 +8,9 @@ import type { GeneratedQuestion } from "./types";
 import { makeRng } from "./rng";
 import { displayPrompt } from "./to-question";
 
-// Chỉ các loại khớp 12 cột (4 đáp án, 1 đúng) + type hợp lệ rowSchema bulk.
-const EXPORTABLE = new Set(["image_choice", "audio_choice", "missing_letter", "multiple_choice"]);
+// Các loại khớp 12 cột: image/audio/missing_letter/multiple_choice (model 4 đáp án),
+// và reorder (quy ước: optionA = cả câu đúng, B/C/D rỗng, correct="A").
+const EXPORTABLE = new Set(["image_choice", "audio_choice", "missing_letter", "multiple_choice", "reorder"]);
 
 const LETTERS = ["A", "B", "C", "D"];
 
@@ -67,6 +68,32 @@ export function toBulkRows(questions: GeneratedQuestion[], opts: ExportOpts): Ex
     }
     const correctAnswer = String(q.correct_answer || q.components.vocab || "").trim();
     const distractors = (q.components.distractors || []).map((d) => String(d).trim()).filter(Boolean);
+
+    // ── reorder: quy ước 12 cột — optionA = cả câu đúng, B/C/D rỗng, correct="A" ──
+    if (type === "reorder") {
+      if (correctAnswer.split(/\s+/).filter(Boolean).length < 2) {
+        skipped.push({ id: q.id, type, reason: "Câu sắp xếp cần ≥ 2 từ." });
+        continue;
+      }
+      const refs = [stripAssetPrefix(q.components.assets.image), stripAssetPrefix(q.components.assets.audio)];
+      const code = `${lessonCode}_${String(seq).padStart(3, "0")}`;
+      seq += 1;
+      rows.push({
+        lessonCode,
+        code,
+        type,
+        skill: q.skill,
+        difficulty: Math.min(5, Math.max(1, q.difficulty || 1)),
+        prompt: q.components.stem || "Sắp xếp các từ thành câu đúng",
+        optionA: correctAnswer,
+        optionB: "",
+        optionC: "",
+        optionD: "",
+        correct: "A",
+        assetRefs: refs.filter(Boolean).join(","),
+      });
+      continue;
+    }
 
     let optionsRaw: string[];
     if (type === "missing_letter") {

@@ -35,7 +35,7 @@ test("danh sách câu hỏi render từ dữ liệu (mock)", async ({ page }) =>
   await expect(page.getByText("G1_W01_1_ENG_005")).toBeVisible();
 });
 
-test("mở Thêm câu hỏi → đổi mode → field tương ứng hiện ra (bài ENG: 4 mode)", async ({
+test("mở Thêm câu hỏi → đổi mode → field tương ứng hiện ra (bài ENG: 5 mode)", async ({
   page,
 }) => {
   await setup(page);
@@ -66,6 +66,11 @@ test("mở Thêm câu hỏi → đổi mode → field tương ứng hiện ra (b
   await modeSelect.click();
   await page.getByRole("option", { name: /Ảnh rồi chọn từ/ }).click();
   await expect(dialog.getByText(/🖼️/)).toBeVisible();
+
+  // reorder (bài ENG): có ô nhập cả câu đúng
+  await modeSelect.click();
+  await page.getByRole("option", { name: /Câu \(sắp xếp\)/ }).click();
+  await expect(dialog.locator("#sentence")).toBeVisible();
 });
 
 test("tạo câu mc → POST /admin/questions với payload đúng (verify toPayload)", async ({

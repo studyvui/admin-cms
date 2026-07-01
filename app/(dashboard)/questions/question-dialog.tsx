@@ -130,7 +130,7 @@ export function QuestionDialog({
   // Danh sách mode hiển thị trong dropdown "Chế độ nhập".
   const availableModes = useMemo(() => {
     const base = isEngLesson
-      ? ["mc", "letter", "audio_choice", "image_choice"]
+      ? ["mc", "letter", "audio_choice", "image_choice", "reorder"]
       : ["mc", "letter", "json"];
     // Khi sửa câu cũ có mode ngoài danh sách (vd json của bài ENG) → giữ để select hiển thị đúng.
     return editing && !base.includes(mode) ? [...base, mode] : base;
@@ -150,6 +150,7 @@ export function QuestionDialog({
     if (mode === "audio_choice") setValue("type", "audio_choice");
     else if (mode === "image_choice") setValue("type", "image_choice");
     else if (mode === "letter") setValue("type", "missing_letter");
+    else if (mode === "reorder") setValue("type", "reorder");
     else if (mode === "mc") setValue("type", "multiple_choice");
   }, [mode, editing, setValue]);
 
@@ -615,6 +616,37 @@ export function QuestionDialog({
                 />
               </div>
             </>
+          ) : mode === "reorder" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="prompt">Đề bài (tuỳ chọn)</Label>
+                <Input
+                  id="prompt"
+                  placeholder="Sắp xếp các từ thành câu đúng"
+                  {...register("prompt" as const)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sentence">Câu đúng (mỗi từ cách nhau bằng dấu cách)</Label>
+                <Input
+                  id="sentence"
+                  placeholder="It is a pen"
+                  {...register("sentence" as const)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  🔤 <b>Câu (sắp xếp)</b>: học sinh kéo/bấm các từ (đã xáo trộn) để xếp lại
+                  đúng câu này. Câu cần ít nhất <b>2 từ</b>.
+                </p>
+                {"sentence" in errors && (
+                  <p className="text-xs text-destructive">
+                    {(errors as Record<string, { message?: string }>).sentence?.message}
+                  </p>
+                )}
+                <ReorderPreview
+                  sentence={(watch("sentence" as const) as string) ?? ""}
+                />
+              </div>
+            </>
           ) : (
             <>
               <div className="space-y-2">
@@ -670,6 +702,29 @@ export function QuestionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Xem trước câu "Sắp xếp" — hiện các thẻ từ (xáo cố định để không nhảy loạn khi gõ).
+function ReorderPreview({ sentence }: { sentence: string }) {
+  const words = sentence.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+  // Xáo hiển thị theo hash ổn định (chỉ để xem trước; lúc lưu mới xáo thật).
+  const shuffled = [...words].sort((a, b) => (a + a.length).localeCompare(b + b.length));
+  return (
+    <div className="rounded-md border bg-muted/30 p-2">
+      <span className="text-xs text-muted-foreground">Xem trước (thẻ từ xáo trộn): </span>
+      <div className="mt-1 flex flex-wrap gap-2">
+        {shuffled.map((w, i) => (
+          <span key={i} className="rounded-md border-2 border-dashed border-gray-300 bg-background px-3 py-1 text-sm font-medium">
+            {w}
+          </span>
+        ))}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Đáp án đúng: <b className="text-foreground">{words.join(" ")}</b>
+      </p>
+    </div>
   );
 }
 
