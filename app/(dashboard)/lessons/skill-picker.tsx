@@ -6,25 +6,29 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SKILL_LABELS } from "@/lib/lessons/labels";
+import { skillLabelsForSubject } from "@/lib/lessons/labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export function SkillPicker({
   value,
   onChange,
+  subject,
 }: {
   value: string;
   onChange: (csv: string) => void;
+  subject?: string;
 }) {
   const [customInput, setCustomInput] = useState("");
+
+  const skillLabels = useMemo(() => skillLabelsForSubject(subject), [subject]);
 
   const selected = useMemo(
     () => new Set(value.split(",").map((s) => s.trim()).filter(Boolean)),
     [value],
   );
 
-  const knownKeys = useMemo(() => new Set(Object.keys(SKILL_LABELS)), []);
+  const knownKeys = useMemo(() => new Set(Object.keys(skillLabels)), [skillLabels]);
 
   const customSkills = useMemo(
     () => Array.from(selected).filter((s) => !knownKeys.has(s)),
@@ -59,7 +63,7 @@ export function SkillPicker({
     <div className="space-y-2">
       {/* Known skills — toggle badges */}
       <div className="flex flex-wrap gap-1.5 rounded-md border bg-muted/20 p-2.5">
-        {Object.entries(SKILL_LABELS).map(([key, label]) => (
+        {Object.entries(skillLabels).map(([key, label]) => (
           <button
             type="button"
             key={key}
