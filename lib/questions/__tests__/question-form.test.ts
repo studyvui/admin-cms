@@ -321,6 +321,54 @@ describe("mode matching (Ghép cặp theo tranh)", () => {
     ).toBe(false);
   });
 
+  it("schema từ chối cặp nhiễu trùng VẾ với cặp đúng hoặc nhiễu khác", () => {
+    const base = {
+      mode: "matching" as const,
+      lessonId: "11111111-1111-4111-8111-111111111111",
+      code: "G1_W03_5_ENG_001",
+      type: "matching",
+      skill: "sentence",
+      difficulty: 1,
+      promptImage: "g1_sent_this_pen.webp",
+      pairLeft: "What is this?",
+      pairRight: "It is a pen",
+    };
+    // Nhiễu trùng CÂU HỎI với cặp đúng (case-insensitive) → reject.
+    expect(
+      questionFormSchema.safeParse({
+        ...base,
+        distractors: [{ left: "what is this?", right: "It is a book" }],
+      }).success,
+    ).toBe(false);
+    // Nhiễu trùng CÂU TRẢ LỜI với cặp đúng → reject.
+    expect(
+      questionFormSchema.safeParse({
+        ...base,
+        distractors: [{ left: "How old are you?", right: "It is a pen" }],
+      }).success,
+    ).toBe(false);
+    // 2 nhiễu trùng vế nhau → reject.
+    expect(
+      questionFormSchema.safeParse({
+        ...base,
+        distractors: [
+          { left: "How old are you?", right: "I am six" },
+          { left: "How old are you?", right: "I am Nam" },
+        ],
+      }).success,
+    ).toBe(false);
+    // Nhiễu khác vế hoàn toàn → pass.
+    expect(
+      questionFormSchema.safeParse({
+        ...base,
+        distractors: [
+          { left: "How old are you?", right: "I am six" },
+          { left: "What is your name?", right: "I am Nam" },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
   it("round-trip ổn định (matching)", () => {
     const q: Question = applyPayload(baseQ, {
       type: "matching",

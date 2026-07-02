@@ -162,17 +162,44 @@ export function QuestionDialog({
     else if (mode === "mc") setValue("type", "multiple_choice");
   }, [mode, editing, setValue]);
 
-  // Mode "matching": khởi tạo 1 cặp nhiễu mặc định từ ngân hàng khi chưa có.
+  // Mode "matching": cặp nhiễu KHÔNG được trùng vế với cặp đúng / nhiễu khác
+  // (2 thẻ giống hệt trên màn làm học sinh bối rối). Dropdown mờ lựa chọn xung đột;
+  // schema cũng chặn khi lưu (superRefine).
   const watchedDistractors = watch("distractors" as const) as
     | { left: string; right: string }[]
     | undefined;
+  const watchedPairLeft = (watch("pairLeft" as const) as string) ?? "";
+  const watchedPairRight = (watch("pairRight" as const) as string) ?? "";
+  const normSide = (s: string) =>
+    (s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  const pairConflicts = (
+    p: { left: string; right: string },
+    exceptIdx: number,
+  ) => {
+    if (
+      normSide(p.left) === normSide(watchedPairLeft) ||
+      normSide(p.right) === normSide(watchedPairRight)
+    )
+      return true;
+    return (watchedDistractors ?? []).some(
+      (d, k) =>
+        k !== exceptIdx &&
+        (normSide(d.left) === normSide(p.left) ||
+          normSide(d.right) === normSide(p.right)),
+    );
+  };
+  const firstFreePair = () =>
+    G1_SENTENCE_PAIRS.find((p) => !pairConflicts(p, -1)) ?? G1_SENTENCE_PAIRS[0];
+
+  // Khởi tạo 1 cặp nhiễu mặc định (không xung đột) từ ngân hàng khi chưa có.
   useEffect(() => {
     if (mode !== "matching") return;
     if (!Array.isArray(watchedDistractors) || watchedDistractors.length === 0) {
-      setValue("distractors" as const, [{ ...G1_SENTENCE_PAIRS[0] }], {
+      setValue("distractors" as const, [{ ...firstFreePair() }], {
         shouldValidate: false,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, watchedDistractors, setValue]);
 
   useEffect(() => {
@@ -764,10 +791,7 @@ export function QuestionDialog({
                     onClick={() =>
                       setValue(
                         "distractors" as const,
-                        [
-                          ...(watchedDistractors ?? []),
-                          { ...G1_SENTENCE_PAIRS[0] },
-                        ],
+                        [...(watchedDistractors ?? []), { ...firstFreePair() }],
                         { shouldValidate: true },
                       )
                     }
@@ -791,11 +815,20 @@ export function QuestionDialog({
                         <SelectValue placeholder="Chọn cặp nhiễu từ ngân hàng..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {G1_SENTENCE_PAIRS.map((p) => (
-                          <SelectItem key={pairKey(p)} value={pairKey(p)}>
-                            {p.left} — {p.right}
-                          </SelectItem>
-                        ))}
+                        {G1_SENTENCE_PAIRS.map((p) => {
+                          const isCurrent =
+                            normSide(p.left) === normSide(d.left) &&
+                            normSide(p.right) === normSide(d.right);
+                          return (
+                            <SelectItem
+                              key={pairKey(p)}
+                              value={pairKey(p)}
+                              disabled={!isCurrent && pairConflicts(p, i)}
+                            >
+                              {p.left} — {p.right}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                     <Button

@@ -147,16 +147,50 @@ const wordBlankSchema = baseSchema.extend({
   promptAudio: z.string().optional(),
 });
 
-export const questionFormSchema = z.discriminatedUnion("mode", [
-  mcSchema,
-  audioChoiceSchema,
-  imageChoiceSchema,
-  jsonSchema,
-  letterSchema,
-  reorderSchema,
-  matchingSchema,
-  wordBlankSchema,
-]);
+/** Chuẩn hoá vế câu để so trùng (trim + lowercase, bỏ khoảng trắng thừa). */
+function normSide(s: string): string {
+  return (s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export const questionFormSchema = z
+  .discriminatedUnion("mode", [
+    mcSchema,
+    audioChoiceSchema,
+    imageChoiceSchema,
+    jsonSchema,
+    letterSchema,
+    reorderSchema,
+    matchingSchema,
+    wordBlankSchema,
+  ])
+  // Matching: cặp nhiễu KHÔNG được trùng vế (câu hỏi/câu trả lời) với cặp đúng
+  // hay với cặp nhiễu khác — 2 thẻ giống hệt nhau trên màn sẽ làm học sinh bối rối
+  // (chạm thẻ "sai" dù chữ y hệt thẻ đúng).
+  .superRefine((v, ctx) => {
+    if (v.mode !== "matching") return;
+    const seenLeft = new Set([normSide(v.pairLeft)]);
+    const seenRight = new Set([normSide(v.pairRight)]);
+    v.distractors.forEach((d, i) => {
+      const l = normSide(d.left);
+      const r = normSide(d.right);
+      if (l && seenLeft.has(l)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["distractors"],
+          message: `Cặp nhiễu ${i + 1} trùng CÂU HỎI "${d.left}" với cặp đúng hoặc cặp nhiễu khác — chọn cặp có câu hỏi khác`,
+        });
+      }
+      if (r && seenRight.has(r)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["distractors"],
+          message: `Cặp nhiễu ${i + 1} trùng CÂU TRẢ LỜI "${d.right}" với cặp đúng hoặc cặp nhiễu khác — chọn cặp có câu trả lời khác`,
+        });
+      }
+      if (l) seenLeft.add(l);
+      if (r) seenRight.add(r);
+    });
+  });
 
 export type QuestionFormValues = z.infer<typeof questionFormSchema>;
 
