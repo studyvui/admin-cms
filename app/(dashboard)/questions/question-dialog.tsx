@@ -12,7 +12,13 @@ import { questionsApi } from "@/lib/api/questions";
 import {
   nextQuestionCode,
   parseMarkedWord,
+  parseMarkedSentence,
 } from "@/lib/questions/question-utils";
+import {
+  G1_SENTENCE_PAIRS,
+  pairKey,
+  pairFromKey,
+} from "@/lib/questions/sentence-bank";
 import {
   questionFormSchema,
   toFormValues,
@@ -130,7 +136,7 @@ export function QuestionDialog({
   // Danh sách mode hiển thị trong dropdown "Chế độ nhập".
   const availableModes = useMemo(() => {
     const base = isEngLesson
-      ? ["mc", "letter", "audio_choice", "image_choice", "reorder"]
+      ? ["mc", "letter", "audio_choice", "image_choice", "reorder", "matching", "word_blank"]
       : ["mc", "letter", "json"];
     // Khi sửa câu cũ có mode ngoài danh sách (vd json của bài ENG) → giữ để select hiển thị đúng.
     return editing && !base.includes(mode) ? [...base, mode] : base;
@@ -151,8 +157,50 @@ export function QuestionDialog({
     else if (mode === "image_choice") setValue("type", "image_choice");
     else if (mode === "letter") setValue("type", "missing_letter");
     else if (mode === "reorder") setValue("type", "reorder");
+    else if (mode === "matching") setValue("type", "matching");
+    else if (mode === "word_blank") setValue("type", "fill_blank");
     else if (mode === "mc") setValue("type", "multiple_choice");
   }, [mode, editing, setValue]);
+
+  // Mode "matching": cặp nhiễu KHÔNG được trùng vế với cặp đúng / nhiễu khác
+  // (2 thẻ giống hệt trên màn làm học sinh bối rối). Dropdown mờ lựa chọn xung đột;
+  // schema cũng chặn khi lưu (superRefine).
+  const watchedDistractors = watch("distractors" as const) as
+    | { left: string; right: string }[]
+    | undefined;
+  const watchedPairLeft = (watch("pairLeft" as const) as string) ?? "";
+  const watchedPairRight = (watch("pairRight" as const) as string) ?? "";
+  const normSide = (s: string) =>
+    (s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  const pairConflicts = (
+    p: { left: string; right: string },
+    exceptIdx: number,
+  ) => {
+    if (
+      normSide(p.left) === normSide(watchedPairLeft) ||
+      normSide(p.right) === normSide(watchedPairRight)
+    )
+      return true;
+    return (watchedDistractors ?? []).some(
+      (d, k) =>
+        k !== exceptIdx &&
+        (normSide(d.left) === normSide(p.left) ||
+          normSide(d.right) === normSide(p.right)),
+    );
+  };
+  const firstFreePair = () =>
+    G1_SENTENCE_PAIRS.find((p) => !pairConflicts(p, -1)) ?? G1_SENTENCE_PAIRS[0];
+
+  // Khởi tạo 1 cặp nhiễu mặc định (không xung đột) từ ngân hàng khi chưa có.
+  useEffect(() => {
+    if (mode !== "matching") return;
+    if (!Array.isArray(watchedDistractors) || watchedDistractors.length === 0) {
+      setValue("distractors" as const, [{ ...firstFreePair() }], {
+        shouldValidate: false,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, watchedDistractors, setValue]);
 
   useEffect(() => {
     if (editing || !watchedLessonId) return;
@@ -647,6 +695,248 @@ export function QuestionDialog({
                 />
               </div>
             </>
+          ) : mode === "matching" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="prompt">Đề bài (tuỳ chọn)</Label>
+                <Input
+                  id="prompt"
+                  placeholder="Nhìn tranh — nối câu hỏi với câu trả lời đúng"
+                  {...register("prompt" as const)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>
+                  Ảnh minh hoạ <span className="text-destructive">*</span>{" "}
+                  <span className="text-xs text-muted-foreground">
+                    (1 ảnh chung gợi cặp đúng — vd g1_sent_name_nam.webp)
+                  </span>
+                </Label>
+                <AssetField
+                  kind="image"
+                  value={(watch("promptImage" as const) as string) ?? ""}
+                  onChange={(v) =>
+                    setValue("promptImage" as const, v, { shouldValidate: true })
+                  }
+                />
+                {"promptImage" in errors && (
+                  <p className="text-xs text-destructive">
+                    {(errors as Record<string, { message?: string }>).promptImage?.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
+                <div className="flex items-center justify-between">
+                  <Label>✅ Cặp ĐÚNG (khớp với ảnh)</Label>
+                  <Select
+                    value=""
+                    onValueChange={(v) => {
+                      const p = pairFromKey(v);
+                      if (!p) return;
+                      setValue("pairLeft" as const, p.left, { shouldValidate: true });
+                      setValue("pairRight" as const, p.right, { shouldValidate: true });
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-56 text-xs">
+                      <SelectValue placeholder="Chọn nhanh từ ngân hàng..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {G1_SENTENCE_PAIRS.map((p) => (
+                        <SelectItem key={pairKey(p)} value={pairKey(p)}>
+                          {p.left} — {p.right}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="pairLeft" className="text-xs">Câu hỏi</Label>
+                    <Input
+                      id="pairLeft"
+                      placeholder="What is your name?"
+                      {...register("pairLeft" as const)}
+                    />
+                    {"pairLeft" in errors && (
+                      <p className="text-xs text-destructive">
+                        {(errors as Record<string, { message?: string }>).pairLeft?.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="pairRight" className="text-xs">Câu trả lời</Label>
+                    <Input
+                      id="pairRight"
+                      placeholder="I am Nam"
+                      {...register("pairRight" as const)}
+                    />
+                    {"pairRight" in errors && (
+                      <p className="text-xs text-destructive">
+                        {(errors as Record<string, { message?: string }>).pairRight?.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>
+                    Cặp NHIỄU (1–3 · chọn từ ngân hàng mẫu câu Lớp 1)
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={(watchedDistractors?.length ?? 0) >= 3}
+                    onClick={() =>
+                      setValue(
+                        "distractors" as const,
+                        [...(watchedDistractors ?? []), { ...firstFreePair() }],
+                        { shouldValidate: true },
+                      )
+                    }
+                  >
+                    + Thêm nhiễu
+                  </Button>
+                </div>
+                {(watchedDistractors ?? []).map((d, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Select
+                      value={d.left && d.right ? `${d.left}|${d.right}` : ""}
+                      onValueChange={(v) => {
+                        const p = pairFromKey(v);
+                        if (!p) return;
+                        const next = (watchedDistractors ?? []).slice();
+                        next[i] = { ...p };
+                        setValue("distractors" as const, next, { shouldValidate: true });
+                      }}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Chọn cặp nhiễu từ ngân hàng..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {G1_SENTENCE_PAIRS.map((p) => {
+                          const isCurrent =
+                            normSide(p.left) === normSide(d.left) &&
+                            normSide(p.right) === normSide(d.right);
+                          return (
+                            <SelectItem
+                              key={pairKey(p)}
+                              value={pairKey(p)}
+                              disabled={!isCurrent && pairConflicts(p, i)}
+                            >
+                              {p.left} — {p.right}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                      disabled={(watchedDistractors?.length ?? 0) <= 1}
+                      onClick={() =>
+                        setValue(
+                          "distractors" as const,
+                          (watchedDistractors ?? []).filter((_, k) => k !== i),
+                          { shouldValidate: true },
+                        )
+                      }
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                ))}
+                {"distractors" in errors && (
+                  <p className="text-xs text-destructive">
+                    {(errors as Record<string, { message?: string }>).distractors?.message}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  🔗 <b>Ghép cặp theo tranh</b>: học sinh nhìn ảnh → chạm 1 câu hỏi
+                  → chạm 1 câu trả lời. Chỉ cặp ĐÚNG khớp ảnh được tính; cặp nhiễu
+                  trộn vào 2 cột.
+                </p>
+                <MatchingPreview
+                  left={(watch("pairLeft" as const) as string) ?? ""}
+                  right={(watch("pairRight" as const) as string) ?? ""}
+                  distractors={watchedDistractors ?? []}
+                />
+              </div>
+            </>
+          ) : mode === "word_blank" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="prompt">Đề bài (tuỳ chọn)</Label>
+                <Input
+                  id="prompt"
+                  placeholder="Chọn từ đúng điền vào chỗ trống"
+                  {...register("prompt" as const)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="markedSentence">
+                  Câu có chỗ trống — bọc <b>từ ẩn</b> trong [ ]
+                </Label>
+                <Input
+                  id="markedSentence"
+                  placeholder="It is a [pen]"
+                  className="font-mono"
+                  {...register("markedSentence" as const)}
+                />
+                {"markedSentence" in errors && (
+                  <p className="text-xs text-destructive">
+                    {(errors as Record<string, { message?: string }>).markedSentence?.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="wordDistractors">Từ nhiễu (cách nhau dấu phẩy)</Label>
+                <Input
+                  id="wordDistractors"
+                  placeholder="book, bag"
+                  className="font-mono"
+                  {...register("wordDistractors" as const)}
+                />
+                {"wordDistractors" in errors && (
+                  <p className="text-xs text-destructive">
+                    {(errors as Record<string, { message?: string }>).wordDistractors?.message}
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Ảnh gợi ý (tuỳ chọn)</Label>
+                  <AssetField
+                    kind="image"
+                    value={(watch("promptImage" as const) as string) ?? ""}
+                    onChange={(v) =>
+                      setValue("promptImage" as const, v, { shouldValidate: true })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Audio đọc câu (tuỳ chọn)</Label>
+                  <AssetField
+                    kind="audio"
+                    value={(watch("promptAudio" as const) as string) ?? ""}
+                    onChange={(v) =>
+                      setValue("promptAudio" as const, v, { shouldValidate: true })
+                    }
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                ✏️ <b>Điền từ vào câu</b>: học sinh thấy câu khuyết 1 từ + ngân
+                hàng từ (đáp án + từ nhiễu, xáo trộn) → chạm từ đúng để điền.
+              </p>
+              <WordBlankPreview
+                marked={(watch("markedSentence" as const) as string) ?? ""}
+                distractorsCsv={(watch("wordDistractors" as const) as string) ?? ""}
+              />
+            </>
           ) : (
             <>
               <div className="space-y-2">
@@ -724,6 +1014,85 @@ function ReorderPreview({ sentence }: { sentence: string }) {
       <p className="mt-1 text-xs text-muted-foreground">
         Đáp án đúng: <b className="text-foreground">{words.join(" ")}</b>
       </p>
+    </div>
+  );
+}
+
+// Xem trước câu "Ghép cặp theo tranh" — cặp đúng ✓ + cặp nhiễu.
+function MatchingPreview({
+  left,
+  right,
+  distractors,
+}: {
+  left: string;
+  right: string;
+  distractors: { left: string; right: string }[];
+}) {
+  if (!left || !right) return null;
+  const chip = (t: string, ok?: boolean) => (
+    <span
+      className={
+        "rounded-full border px-2.5 py-0.5 text-xs " +
+        (ok ? "border-emerald-300 bg-emerald-50" : "border-gray-200 bg-muted/40")
+      }
+    >
+      {t}
+    </span>
+  );
+  return (
+    <div className="rounded-md border bg-muted/30 p-2 text-sm">
+      <span className="text-xs text-muted-foreground">
+        Xem trước (2 cột sẽ xáo khi học sinh làm):
+      </span>
+      <div className="mt-1 space-y-1">
+        <div className="flex items-center gap-1.5">
+          {chip(left, true)} ↔ {chip(right, true)}
+          <span className="text-xs text-emerald-600">✓ đúng</span>
+        </div>
+        {distractors
+          .filter((d) => d.left && d.right)
+          .map((d, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              {chip(d.left)} ↔ {chip(d.right)}
+              <span className="text-xs text-muted-foreground">(nhiễu)</span>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+// Xem trước câu "Điền từ vào câu" — câu khuyết + ngân hàng từ.
+function WordBlankPreview({
+  marked,
+  distractorsCsv,
+}: {
+  marked: string;
+  distractorsCsv: string;
+}) {
+  const parsed = parseMarkedSentence(marked);
+  if (!parsed) return null;
+  const ds = distractorsCsv.split(",").map((s) => s.trim()).filter(Boolean);
+  return (
+    <div className="rounded-md border bg-muted/30 p-2 text-sm">
+      <span className="text-xs text-muted-foreground">Xem trước: </span>
+      <span className="font-mono font-semibold">
+        {[parsed.prefix, "___", parsed.suffix].filter(Boolean).join(" ")}
+      </span>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-muted-foreground">Từ cho học sinh chọn:</span>
+        {[parsed.answer, ...ds].map((w, i) => (
+          <span
+            key={i}
+            className="rounded-md border-2 border-dashed border-gray-300 bg-background px-2.5 py-0.5 text-xs font-medium"
+          >
+            {w}
+          </span>
+        ))}
+        <span className="text-xs text-muted-foreground">
+          · đáp án: <b className="text-foreground">{parsed.answer}</b>
+        </span>
+      </div>
     </div>
   );
 }

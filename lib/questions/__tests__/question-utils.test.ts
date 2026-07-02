@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   nextQuestionCode,
   parseMarkedWord,
+  parseMarkedSentence,
   shuffleArr,
   genDistractorLetters,
 } from "@/lib/questions/question-utils";
@@ -17,6 +18,37 @@ function mulberry32(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+describe("parseMarkedSentence", () => {
+  it("tách câu có [từ ẩn] giữa câu", () => {
+    expect(parseMarkedSentence("It is a [pen]")).toEqual({
+      prefix: "It is a",
+      answer: "pen",
+      suffix: "",
+    });
+    expect(parseMarkedSentence("I [am] Nam")).toEqual({
+      prefix: "I",
+      answer: "am",
+      suffix: "Nam",
+    });
+  });
+
+  it("từ ẩn ở đầu câu / có dấu câu quanh", () => {
+    expect(parseMarkedSentence("[What] is this?")).toEqual({
+      prefix: "",
+      answer: "What",
+      suffix: "is this?",
+    });
+  });
+
+  it("từ chối: không có [ ], nhiều cặp [ ], từ ẩn nhiều từ, rỗng", () => {
+    expect(parseMarkedSentence("It is a pen")).toBeNull();
+    expect(parseMarkedSentence("It [is] a [pen]")).toBeNull();
+    expect(parseMarkedSentence("It is [a pen]")).toBeNull();
+    expect(parseMarkedSentence("[]")).toBeNull();
+    expect(parseMarkedSentence("")).toBeNull();
+  });
+});
 
 describe("nextQuestionCode", () => {
   it("sinh seq 001 khi chưa có mã nào", () => {
