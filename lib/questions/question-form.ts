@@ -7,6 +7,7 @@ import type { Question } from "@/lib/types";
 import { isImageKey, isAudioKey } from "@/lib/assets/asset-kind";
 import {
   parseMarkedWord,
+  parseMarkedSentence,
   shuffleArr,
   genDistractorLetters,
 } from "@/lib/questions/question-utils";
@@ -106,14 +107,90 @@ const reorderSchema = baseSchema.extend({
     }),
 });
 
-export const questionFormSchema = z.discriminatedUnion("mode", [
-  mcSchema,
-  audioChoiceSchema,
-  imageChoiceSchema,
-  jsonSchema,
-  letterSchema,
-  reorderSchema,
-]);
+// "Ghép cặp theo tranh": 1 ảnh minh hoạ (bắt buộc) + 1 cặp hỏi–đáp ĐÚNG khớp ảnh +
+// 1–3 cặp NHIỄU (chọn từ ngân hàng mẫu câu L1). Học sinh chỉ cần nối đúng 1 cặp theo tranh.
+const matchingSchema = baseSchema.extend({
+  mode: z.literal("matching"),
+  prompt: z.string().optional(),
+  promptImage: z.string().min(1, "Cần chọn ảnh minh hoạ"),
+  pairLeft: z.string().min(1, "Cần câu hỏi của cặp đúng"),
+  pairRight: z.string().min(1, "Cần câu trả lời của cặp đúng"),
+  distractors: z
+    .array(
+      z.object({
+        left: z.string().min(1, "Chọn cặp nhiễu"),
+        right: z.string().min(1, "Chọn cặp nhiễu"),
+      }),
+    )
+    .min(1, "Cần ít nhất 1 cặp nhiễu")
+    .max(3, "Tối đa 3 cặp nhiễu"),
+});
+
+// "Điền từ vào câu": gõ CẢ CÂU với [..] bao đúng 1 TỪ ẩn (vd "It is a [pen]") +
+// từ nhiễu (CSV). Học sinh chạm từ đúng trong ngân hàng để điền vào chỗ trống.
+const wordBlankSchema = baseSchema.extend({
+  mode: z.literal("word_blank"),
+  prompt: z.string().optional(),
+  markedSentence: z
+    .string()
+    .min(1)
+    .refine((v) => parseMarkedSentence(v) !== null, {
+      message: "Gõ cả câu, bao đúng 1 TỪ ẩn trong [..], vd: It is a [pen]",
+    }),
+  wordDistractors: z
+    .string()
+    .min(1)
+    .refine((v) => v.split(",").map((s) => s.trim()).filter(Boolean).length >= 1, {
+      message: "Cần ít nhất 1 từ nhiễu (cách nhau dấu phẩy)",
+    }),
+  promptImage: z.string().optional(),
+  promptAudio: z.string().optional(),
+});
+
+/** Chuẩn hoá vế câu để so trùng (trim + lowercase, bỏ khoảng trắng thừa). */
+function normSide(s: string): string {
+  return (s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export const questionFormSchema = z
+  .discriminatedUnion("mode", [
+    mcSchema,
+    audioChoiceSchema,
+    imageChoiceSchema,
+    jsonSchema,
+    letterSchema,
+    reorderSchema,
+    matchingSchema,
+    wordBlankSchema,
+  ])
+  // Matching: cặp nhiễu KHÔNG được trùng vế (câu hỏi/câu trả lời) với cặp đúng
+  // hay với cặp nhiễu khác — 2 thẻ giống hệt nhau trên màn sẽ làm học sinh bối rối
+  // (chạm thẻ "sai" dù chữ y hệt thẻ đúng).
+  .superRefine((v, ctx) => {
+    if (v.mode !== "matching") return;
+    const seenLeft = new Set([normSide(v.pairLeft)]);
+    const seenRight = new Set([normSide(v.pairRight)]);
+    v.distractors.forEach((d, i) => {
+      const l = normSide(d.left);
+      const r = normSide(d.right);
+      if (l && seenLeft.has(l)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["distractors"],
+          message: `Cặp nhiễu ${i + 1} trùng CÂU HỎI "${d.left}" với cặp đúng hoặc cặp nhiễu khác — chọn cặp có câu hỏi khác`,
+        });
+      }
+      if (r && seenRight.has(r)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["distractors"],
+          message: `Cặp nhiễu ${i + 1} trùng CÂU TRẢ LỜI "${d.right}" với cặp đúng hoặc cặp nhiễu khác — chọn cặp có câu trả lời khác`,
+        });
+      }
+      if (l) seenLeft.add(l);
+      if (r) seenRight.add(r);
+    });
+  });
 
 export type QuestionFormValues = z.infer<typeof questionFormSchema>;
 
@@ -246,6 +323,54 @@ export function toPayload(
     };
     correctAnswer = correct_order.join(" ");
     finalType = "reorder"; // ép loại
+  } else if (values.mode === "matching") {
+    // "Ghép cặp theo tranh": 1 ảnh + 1 cặp đúng + cặp nhiễu. Render xáo 2 cột phía học sinh.
+    const pair = { left: values.pairLeft.trim(), right: values.pairRight.trim() };
+    content = {
+      prompt:
+        (values.prompt ?? "").trim() ||
+        "Nhìn tranh — nối câu hỏi với câu trả lời đúng",
+      image: values.promptImage,
+      pair,
+      distractors: values.distractors.map((d) => ({
+        left: d.left.trim(),
+        right: d.right.trim(),
+      })),
+    };
+    correctAnswer = `${pair.left} → ${pair.right}`;
+    finalType = "matching"; // ép loại
+    // assetRefs = ảnh minh hoạ + phần asset khác (vd audio nếu có).
+    const nonImage = assetRefs.filter((r) => !isImageKey(r));
+    assetRefs = [values.promptImage, ...nonImage];
+  } else if (values.mode === "word_blank") {
+    // "Điền từ vào câu": parse câu [từ ẩn] → options = đáp án + từ nhiễu (xáo).
+    const parsed = parseMarkedSentence(values.markedSentence)!; // schema đã refine hợp lệ
+    const distractorWords = values.wordDistractors
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const options = shuffleArr([parsed.answer, ...distractorWords], rng);
+    content = {
+      prompt:
+        (values.prompt ?? "").trim() || "Chọn từ đúng điền vào chỗ trống",
+      prefix: parsed.prefix,
+      suffix: parsed.suffix,
+      answer: parsed.answer,
+      // distractors giữ THỨ TỰ GỐC admin gõ (để mở Sửa → lưu lại ổn định);
+      // options = đáp án + nhiễu ĐÃ XÁO (cho render/preview).
+      distractors: distractorWords,
+      options,
+      ...(values.promptImage?.trim() ? { image: values.promptImage.trim() } : {}),
+    };
+    correctAnswer = parsed.answer;
+    finalType = "fill_blank"; // ép loại
+    // assetRefs = ảnh gợi ý + audio (nếu có) + phần asset khác.
+    const others = assetRefs.filter((r) => !isImageKey(r) && !isAudioKey(r));
+    assetRefs = [
+      ...others,
+      ...(values.promptImage?.trim() ? [values.promptImage.trim()] : []),
+      ...(values.promptAudio?.trim() ? [values.promptAudio.trim()] : []),
+    ];
   } else {
     content = JSON.parse(values.contentJson);
     correctAnswer = values.correctAnswer;
@@ -364,6 +489,89 @@ export function toFormValues(editing: Question): QuestionFormValues {
         | "C"
         | "D",
     };
+  }
+
+  // "Ghép cặp theo tranh" (matching): content đúng shape (có pair.left/right) → dựng lại form.
+  // Matching content dạng khác (legacy/tự do) rơi xuống mode json như cũ.
+  {
+    const cm = editing.content as {
+      prompt?: string;
+      image?: string;
+      pair?: { left?: string; right?: string };
+      distractors?: { left?: string; right?: string }[];
+    };
+    if (editing.type === "matching" && cm.pair?.left && cm.pair?.right) {
+      const promptImage = cm.image ?? editing.assetRefs.find(isImageKey) ?? "";
+      const distractors = (Array.isArray(cm.distractors) ? cm.distractors : [])
+        .map((d) => ({ left: d?.left ?? "", right: d?.right ?? "" }))
+        .filter((d) => d.left && d.right);
+      return {
+        mode: "matching",
+        lessonId: editing.lessonId,
+        code: editing.code,
+        type: editing.type,
+        skill: editing.skill,
+        difficulty: editing.difficulty,
+        // Ảnh minh hoạ có field riêng → "Asset đính kèm" chỉ giữ phần còn lại.
+        assetRefsCsv: editing.assetRefs
+          .filter((r) => r !== promptImage)
+          .join(", "),
+        prompt: cm.prompt ?? "",
+        promptImage,
+        pairLeft: cm.pair.left,
+        pairRight: cm.pair.right,
+        distractors: distractors.length ? distractors : [{ left: "", right: "" }],
+      };
+    }
+  }
+
+  // "Điền từ vào câu" (fill_blank có options): dựng lại markedSentence + từ nhiễu.
+  {
+    const cw = editing.content as {
+      prompt?: string;
+      prefix?: string;
+      suffix?: string;
+      answer?: string;
+      distractors?: unknown;
+      options?: unknown;
+      image?: string;
+    };
+    if (
+      editing.type === "fill_blank" &&
+      typeof cw.answer === "string" &&
+      cw.answer &&
+      Array.isArray(cw.options)
+    ) {
+      const promptImage =
+        cw.image ?? editing.assetRefs.find(isImageKey) ?? "";
+      const promptAudio = editing.assetRefs.find(isAudioKey) ?? "";
+      // Ưu tiên distractors gốc (thứ tự admin gõ); fallback options∖answer cho data cũ.
+      const distractorWords = (
+        Array.isArray(cw.distractors) && cw.distractors.length
+          ? (cw.distractors as string[])
+          : (cw.options as string[]).filter((o) => String(o) !== cw.answer)
+      ).map(String);
+      const prefix = typeof cw.prefix === "string" ? cw.prefix : "";
+      const suffix = typeof cw.suffix === "string" ? cw.suffix : "";
+      return {
+        mode: "word_blank",
+        lessonId: editing.lessonId,
+        code: editing.code,
+        type: editing.type,
+        skill: editing.skill,
+        difficulty: editing.difficulty,
+        assetRefsCsv: editing.assetRefs
+          .filter((r) => r !== promptImage && r !== promptAudio)
+          .join(", "),
+        prompt: cw.prompt ?? "",
+        markedSentence: [prefix, `[${cw.answer}]`, suffix]
+          .filter(Boolean)
+          .join(" "),
+        wordDistractors: distractorWords.join(", "),
+        promptImage,
+        promptAudio,
+      };
+    }
   }
 
   // "Câu (sắp xếp)" (reorder): content có correct_order → dựng lại câu đúng.
