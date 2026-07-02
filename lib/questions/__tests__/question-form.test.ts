@@ -145,9 +145,9 @@ describe("toFormValues ↔ toPayload — round-trip ổn định", () => {
     expect(p.correctAnswer).toBe("dog");
   });
 
-  it("mode json (content tuỳ ý, loại chưa có mode riêng → JSON passthrough)", () => {
+  it("mode json (content tuỳ ý, không đúng shape mode nào → JSON passthrough)", () => {
     const q: Question = applyPayload(baseQ, {
-      type: "matching", // loại chưa có form mode riêng → về mode json
+      type: "matching", // matching nhưng content KHÔNG có pair → về mode json (legacy)
       skill: "vocab",
       difficulty: 3,
       content: { prompt: "Nối từ", tokens: ["I", "am", "happy"] },
@@ -253,6 +253,203 @@ describe("mode reorder (Câu sắp xếp)", () => {
     });
     const p = expectStableRoundTrip(q);
     expect((p.content as { correct_order: string[] }).correct_order).toEqual(["It", "is", "a", "pen"]);
+  });
+});
+
+describe("mode matching (Ghép cặp theo tranh)", () => {
+  it("toPayload: 1 ảnh + cặp đúng + nhiễu → content {image, pair, distractors}", () => {
+    const p = toPayload(
+      {
+        mode: "matching",
+        lessonId: "11111111-1111-4111-8111-111111111111",
+        code: "G1_W09_5_ENG_001",
+        type: "matching",
+        skill: "sentence",
+        difficulty: 1,
+        assetRefsCsv: "",
+        prompt: "",
+        promptImage: "images/grade1/english/g1_sent_name_nam.webp",
+        pairLeft: "What is your name?",
+        pairRight: "I am Nam",
+        distractors: [
+          { left: "What is this?", right: "It is a pen" },
+          { left: "How old are you?", right: "I am six" },
+        ],
+      },
+      mulberry32(7),
+    );
+    expect(p.type).toBe("matching");
+    expect(p.correctAnswer).toBe("What is your name? → I am Nam");
+    const c = p.content as {
+      image: string;
+      pair: { left: string; right: string };
+      distractors: { left: string; right: string }[];
+      prompt: string;
+    };
+    expect(c.image).toBe("images/grade1/english/g1_sent_name_nam.webp");
+    expect(c.pair).toEqual({ left: "What is your name?", right: "I am Nam" });
+    expect(c.distractors).toHaveLength(2);
+    expect(c.prompt).toBe("Nhìn tranh — nối câu hỏi với câu trả lời đúng");
+    // Ảnh minh hoạ đứng đầu assetRefs.
+    expect(p.assetRefs[0]).toBe("images/grade1/english/g1_sent_name_nam.webp");
+  });
+
+  it("schema từ chối khi thiếu ảnh hoặc 0 cặp nhiễu", () => {
+    const base = {
+      mode: "matching" as const,
+      lessonId: "11111111-1111-4111-8111-111111111111",
+      code: "G1_W09_5_ENG_001",
+      type: "matching",
+      skill: "sentence",
+      difficulty: 1,
+      pairLeft: "What is your name?",
+      pairRight: "I am Nam",
+    };
+    expect(
+      questionFormSchema.safeParse({
+        ...base,
+        promptImage: "",
+        distractors: [{ left: "a", right: "b" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      questionFormSchema.safeParse({
+        ...base,
+        promptImage: "x.webp",
+        distractors: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("round-trip ổn định (matching)", () => {
+    const q: Question = applyPayload(baseQ, {
+      type: "matching",
+      skill: "sentence",
+      difficulty: 1,
+      content: {
+        prompt: "Nhìn tranh — nối câu hỏi với câu trả lời đúng",
+        image: "images/grade1/english/g1_sent_name_nam.webp",
+        pair: { left: "What is your name?", right: "I am Nam" },
+        distractors: [{ left: "What is this?", right: "It is a pen" }],
+      },
+      correctAnswer: "What is your name? → I am Nam",
+      assetRefs: ["images/grade1/english/g1_sent_name_nam.webp"],
+    });
+    const p = expectStableRoundTrip(q);
+    expect((p.content as { pair: { left: string } }).pair.left).toBe(
+      "What is your name?",
+    );
+  });
+});
+
+describe("mode word_blank (Điền từ vào câu)", () => {
+  it("toPayload: câu [từ ẩn] + nhiễu → content {prefix, suffix, answer, options} + type fill_blank", () => {
+    const p = toPayload(
+      {
+        mode: "word_blank",
+        lessonId: "11111111-1111-4111-8111-111111111111",
+        code: "G1_W03_5_ENG_002",
+        type: "fill_blank",
+        skill: "sentence",
+        difficulty: 1,
+        assetRefsCsv: "",
+        prompt: "",
+        markedSentence: "It is a [pen]",
+        wordDistractors: "book, bag",
+        promptImage: "images/grade1/english/g1_sent_this_pen.webp",
+        promptAudio: "audio/grade1/english/pen.mp3",
+      },
+      mulberry32(7),
+    );
+    expect(p.type).toBe("fill_blank");
+    expect(p.correctAnswer).toBe("pen");
+    const c = p.content as {
+      prefix: string;
+      suffix: string;
+      answer: string;
+      distractors: string[];
+      options: string[];
+      image: string;
+    };
+    expect(c.prefix).toBe("It is a");
+    expect(c.suffix).toBe("");
+    expect(c.answer).toBe("pen");
+    expect(c.distractors).toEqual(["book", "bag"]);
+    expect([...c.options].sort()).toEqual(["bag", "book", "pen"]);
+    expect(c.image).toBe("images/grade1/english/g1_sent_this_pen.webp");
+    // assetRefs chứa ảnh + audio.
+    expect(p.assetRefs).toContain("images/grade1/english/g1_sent_this_pen.webp");
+    expect(p.assetRefs).toContain("audio/grade1/english/pen.mp3");
+  });
+
+  it("schema từ chối câu không có [từ ẩn] hoặc thiếu từ nhiễu", () => {
+    const base = {
+      mode: "word_blank" as const,
+      lessonId: "11111111-1111-4111-8111-111111111111",
+      code: "G1_W03_5_ENG_002",
+      type: "fill_blank",
+      skill: "sentence",
+      difficulty: 1,
+    };
+    expect(
+      questionFormSchema.safeParse({
+        ...base,
+        markedSentence: "It is a pen",
+        wordDistractors: "book",
+      }).success,
+    ).toBe(false);
+    expect(
+      questionFormSchema.safeParse({
+        ...base,
+        markedSentence: "It is a [pen]",
+        wordDistractors: "  ",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("round-trip ổn định (word_blank — distractors giữ thứ tự gốc)", () => {
+    const q: Question = applyPayload(baseQ, {
+      type: "fill_blank",
+      skill: "sentence",
+      difficulty: 1,
+      content: {
+        prompt: "Chọn từ đúng điền vào chỗ trống",
+        prefix: "It is a",
+        suffix: "",
+        answer: "pen",
+        distractors: ["book", "bag"],
+        options: ["bag", "pen", "book"],
+        image: "images/grade1/english/g1_sent_this_pen.webp",
+      },
+      correctAnswer: "pen",
+      assetRefs: ["images/grade1/english/g1_sent_this_pen.webp"],
+    });
+    const p = expectStableRoundTrip(q);
+    expect((p.content as { answer: string }).answer).toBe("pen");
+    expect((p.content as { distractors: string[] }).distractors).toEqual([
+      "book",
+      "bag",
+    ]);
+  });
+
+  it("data cũ không có distractors → suy từ options∖answer, vẫn nạp form được", () => {
+    const q: Question = applyPayload(baseQ, {
+      type: "fill_blank",
+      skill: "sentence",
+      difficulty: 1,
+      content: {
+        prefix: "I am",
+        suffix: "",
+        answer: "six",
+        options: ["six", "ten", "two"],
+      },
+      correctAnswer: "six",
+      assetRefs: [],
+    });
+    const f = toFormValues(q);
+    if (f.mode !== "word_blank") throw new Error("phải là mode word_blank");
+    expect(f.markedSentence).toBe("I am [six]");
+    expect(f.wordDistractors).toBe("ten, two");
   });
 });
 

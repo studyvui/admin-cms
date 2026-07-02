@@ -29,6 +29,19 @@ export function parseMarkedWord(
   return { prefix: m[1], hidden: m[2], suffix: m[3] };
 }
 
+// ── Helper cho loại "Điền từ vào câu" (mode "word_blank") ──
+// Cú pháp: gõ CẢ CÂU với [..] bao đúng 1 TỪ bị ẩn. Vd "It is a [pen]" →
+// { prefix: "It is a", answer: "pen", suffix: "" }.
+export function parseMarkedSentence(
+  s: string,
+): { prefix: string; answer: string; suffix: string } | null {
+  const m = (s ?? "").trim().match(/^([^[\]]*)\[([^[\]]+)\]([^[\]]*)$/);
+  if (!m) return null;
+  const answer = m[2].trim();
+  if (!answer || /\s/.test(answer)) return null; // từ ẩn phải là 1 từ, không rỗng
+  return { prefix: m[1].trim(), answer, suffix: m[3].trim() };
+}
+
 /** Trộn mảng (Fisher–Yates). `rng` mặc định Math.random; tiêm để test xác định. */
 export function shuffleArr<T>(a: T[], rng: () => number = Math.random): T[] {
   const r = a.slice();
