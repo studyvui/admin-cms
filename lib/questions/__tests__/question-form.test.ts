@@ -254,6 +254,22 @@ describe("mode reorder (Câu sắp xếp)", () => {
     const p = expectStableRoundTrip(q);
     expect((p.content as { correct_order: string[] }).correct_order).toEqual(["It", "is", "a", "pen"]);
   });
+
+  it("reorder có audio đọc câu → assetRefs giữ mp3, Sửa dựng lại promptAudio", () => {
+    const q: Question = applyPayload(baseQ, {
+      type: "reorder",
+      skill: "sentence",
+      difficulty: 1,
+      content: { prompt: "Sắp xếp các từ thành câu đúng", items: ["pen", "a", "is", "It"], correct_order: ["It", "is", "a", "pen"] },
+      correctAnswer: "It is a pen",
+      assetRefs: ["audio/grade1/english/g1_sent_it_is_a_pen.mp3"],
+    });
+    const f = toFormValues(q);
+    if (f.mode !== "reorder") throw new Error("phải là mode reorder");
+    expect(f.promptAudio).toBe("audio/grade1/english/g1_sent_it_is_a_pen.mp3");
+    const p = expectStableRoundTrip(q);
+    expect(p.assetRefs).toContain("audio/grade1/english/g1_sent_it_is_a_pen.mp3");
+  });
 });
 
 describe("mode matching (Ghép cặp theo tranh)", () => {
@@ -269,6 +285,7 @@ describe("mode matching (Ghép cặp theo tranh)", () => {
         assetRefsCsv: "",
         prompt: "",
         promptImage: "images/grade1/english/g1_sent_name_nam.webp",
+        promptAudio: "audio/grade1/english/g1_sent_what_is_your_name.mp3",
         pairLeft: "What is your name?",
         pairRight: "I am Nam",
         distractors: [
@@ -280,6 +297,8 @@ describe("mode matching (Ghép cặp theo tranh)", () => {
     );
     expect(p.type).toBe("matching");
     expect(p.correctAnswer).toBe("What is your name? → I am Nam");
+    // Audio đọc câu nằm trong assetRefs (renderer HS tự nhặt .mp3).
+    expect(p.assetRefs).toContain("audio/grade1/english/g1_sent_what_is_your_name.mp3");
     const c = p.content as {
       image: string;
       pair: { left: string; right: string };
