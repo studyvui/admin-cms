@@ -694,6 +694,20 @@ export function QuestionDialog({
                   sentence={(watch("sentence" as const) as string) ?? ""}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Audio đọc câu (tuỳ chọn)</Label>
+                <AssetField
+                  kind="audio"
+                  value={(watch("promptAudio" as const) as string) ?? ""}
+                  onChange={(v) =>
+                    setValue("promptAudio" as const, v, { shouldValidate: true })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  🔊 Học sinh nghe câu đọc lên rồi xếp từ theo — chọn file
+                  <code className="mx-1">g1_sent_*.mp3</code> từ Kho asset.
+                </p>
+              </div>
             </>
           ) : mode === "matching" ? (
             <>
@@ -724,6 +738,16 @@ export function QuestionDialog({
                     {(errors as Record<string, { message?: string }>).promptImage?.message}
                   </p>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label>Audio đọc câu (tuỳ chọn)</Label>
+                <AssetField
+                  kind="audio"
+                  value={(watch("promptAudio" as const) as string) ?? ""}
+                  onChange={(v) =>
+                    setValue("promptAudio" as const, v, { shouldValidate: true })
+                  }
+                />
               </div>
               <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
                 <div className="flex items-center justify-between">
