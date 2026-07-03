@@ -105,6 +105,7 @@ const reorderSchema = baseSchema.extend({
     .refine((v) => v.trim().split(/\s+/).filter(Boolean).length >= 2, {
       message: "Câu cần ít nhất 2 từ",
     }),
+  promptAudio: z.string().optional(), // audio đọc cả câu (tuỳ chọn) — HS bấm 🔊 nghe lại
 });
 
 // "Ghép cặp theo tranh": 1 ảnh minh hoạ (bắt buộc) + 1 cặp hỏi–đáp ĐÚNG khớp ảnh +
@@ -115,6 +116,7 @@ const matchingSchema = baseSchema.extend({
   promptImage: z.string().min(1, "Cần chọn ảnh minh hoạ"),
   pairLeft: z.string().min(1, "Cần câu hỏi của cặp đúng"),
   pairRight: z.string().min(1, "Cần câu trả lời của cặp đúng"),
+  promptAudio: z.string().optional(), // audio đọc cặp câu (tuỳ chọn) — HS bấm 🔊 nghe lại
   distractors: z
     .array(
       z.object({
@@ -323,6 +325,13 @@ export function toPayload(
     };
     correctAnswer = correct_order.join(" ");
     finalType = "reorder"; // ép loại
+    // Audio đọc câu (nếu chọn) đưa vào assetRefs — renderer HS tự nhặt file .mp3.
+    if (values.promptAudio?.trim()) {
+      assetRefs = [
+        ...assetRefs.filter((r) => !isAudioKey(r)),
+        values.promptAudio.trim(),
+      ];
+    }
   } else if (values.mode === "matching") {
     // "Ghép cặp theo tranh": 1 ảnh + 1 cặp đúng + cặp nhiễu. Render xáo 2 cột phía học sinh.
     const pair = { left: values.pairLeft.trim(), right: values.pairRight.trim() };
@@ -339,9 +348,13 @@ export function toPayload(
     };
     correctAnswer = `${pair.left} → ${pair.right}`;
     finalType = "matching"; // ép loại
-    // assetRefs = ảnh minh hoạ + phần asset khác (vd audio nếu có).
-    const nonImage = assetRefs.filter((r) => !isImageKey(r));
-    assetRefs = [values.promptImage, ...nonImage];
+    // assetRefs = ảnh minh hoạ + audio đọc câu (nếu chọn) + phần asset khác.
+    const others = assetRefs.filter((r) => !isImageKey(r) && !isAudioKey(r));
+    assetRefs = [
+      values.promptImage,
+      ...(values.promptAudio?.trim() ? [values.promptAudio.trim()] : []),
+      ...others,
+    ];
   } else if (values.mode === "word_blank") {
     // "Điền từ vào câu": parse câu [từ ẩn] → options = đáp án + từ nhiễu (xáo).
     const parsed = parseMarkedSentence(values.markedSentence)!; // schema đã refine hợp lệ
@@ -502,6 +515,7 @@ export function toFormValues(editing: Question): QuestionFormValues {
     };
     if (editing.type === "matching" && cm.pair?.left && cm.pair?.right) {
       const promptImage = cm.image ?? editing.assetRefs.find(isImageKey) ?? "";
+      const promptAudio = editing.assetRefs.find(isAudioKey) ?? "";
       const distractors = (Array.isArray(cm.distractors) ? cm.distractors : [])
         .map((d) => ({ left: d?.left ?? "", right: d?.right ?? "" }))
         .filter((d) => d.left && d.right);
@@ -512,12 +526,13 @@ export function toFormValues(editing: Question): QuestionFormValues {
         type: editing.type,
         skill: editing.skill,
         difficulty: editing.difficulty,
-        // Ảnh minh hoạ có field riêng → "Asset đính kèm" chỉ giữ phần còn lại.
+        // Ảnh + audio có field riêng → "Asset đính kèm" chỉ giữ phần còn lại.
         assetRefsCsv: editing.assetRefs
-          .filter((r) => r !== promptImage)
+          .filter((r) => r !== promptImage && r !== promptAudio)
           .join(", "),
         prompt: cm.prompt ?? "",
         promptImage,
+        promptAudio,
         pairLeft: cm.pair.left,
         pairRight: cm.pair.right,
         distractors: distractors.length ? distractors : [{ left: "", right: "" }],
@@ -580,6 +595,7 @@ export function toFormValues(editing: Question): QuestionFormValues {
     const order = Array.isArray(cr.correct_order)
       ? (cr.correct_order as string[])
       : String(editing.correctAnswer).trim().split(/\s+/).filter(Boolean);
+    const promptAudio = editing.assetRefs.find(isAudioKey) ?? "";
     return {
       mode: "reorder",
       lessonId: editing.lessonId,
@@ -587,9 +603,11 @@ export function toFormValues(editing: Question): QuestionFormValues {
       type: editing.type,
       skill: editing.skill,
       difficulty: editing.difficulty,
-      assetRefsCsv: editing.assetRefs.join(", "),
+      // Audio có field riêng → "Asset đính kèm" chỉ giữ phần còn lại.
+      assetRefsCsv: editing.assetRefs.filter((r) => r !== promptAudio).join(", "),
       prompt: cr.prompt ?? "",
       sentence: order.join(" "),
+      promptAudio,
     };
   }
 
