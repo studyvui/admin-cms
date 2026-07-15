@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { generateEnglishQuestionsWithProgress } from "@/lib/eng-gen/master-generator";
 import { toBulkRows, downloadBulkXlsx } from "@/lib/eng-gen/export-xlsx";
 import { generatedToQuestion } from "@/lib/eng-gen/to-question";
 import {
@@ -30,7 +29,7 @@ import { assetsApi } from "@/lib/api/assets";
 import type { Course, CreateQuestionInput, Lesson } from "@/lib/types";
 import type { Question } from "@/lib/types";
 import { questionsApi } from "@/lib/api/questions";
-import type { GeneratedQuestion, GenReport, Skill, BlueprintType } from "@/lib/eng-gen/types";
+import type { GeneratedQuestion, GenReport, Skill } from "@/lib/eng-gen/types";
 
 const SKILLS: { value: Skill; label: string }[] = [
   { value: "vocabulary", label: "Từ vựng" },
@@ -41,21 +40,13 @@ const SKILLS: { value: Skill; label: string }[] = [
 ];
 
 
-type InputMode = "mc" | "letter" | "audio_choice" | "image_choice";
+type InputMode = "letter" | "audio_choice" | "image_choice";
 
 const INPUT_MODES: { value: InputMode; label: string }[] = [
-  { value: "mc", label: "Trắc nghiệm 4 lựa chọn (đơn giản)" },
   { value: "letter", label: "Điền chữ còn thiếu (kéo thẻ chữ)" },
   { value: "audio_choice", label: "Nghe rồi chọn ảnh" },
   { value: "image_choice", label: "Ảnh rồi chọn từ" },
 ];
-
-const MODE_TO_BLUEPRINT: Record<InputMode, BlueprintType> = {
-  mc: "image_choice",
-  letter: "missing_letter",
-  audio_choice: "audio_choice",
-  image_choice: "image_choice",
-};
 
 const EXPORTABLE = new Set(["image_choice", "audio_choice", "missing_letter", "multiple_choice", "reorder"]);
 const DIFF_COLOR: Record<number, string> = { 1: "#10b981", 2: "#f59e0b", 3: "#ef4444" };
@@ -144,10 +135,7 @@ export default function AiGeneratePage() {
   const [mode, setMode] = useState<InputMode>("image_choice");
   const [count, setCount] = useState(10);
   const [dMin, setDMin] = useState(1);
-  const [dMax, setDMax] = useState(2);
   const [startSeq, setStartSeq] = useState(101);
-
-  const blueprint = MODE_TO_BLUEPRINT[mode];
 
   // Auto-reset skill when lesson changes and current skill is not available
   useEffect(() => {
@@ -186,47 +174,24 @@ export default function AiGeneratePage() {
     setReport(null);
     setSelected(new Set());
     try {
-      let qs: GeneratedQuestion[];
-      let rpt: GenReport;
-
-      if (mode === "audio_choice" || mode === "image_choice" || mode === "letter") {
-        if (!selectedLesson) throw new Error("Chưa chọn bài học.");
-        const imgAssets = await assetsApi.list({ type: "image" });
-        const genOpts: VocabGenOpts = {
-          selectedLesson,
-          allLessons: lessons,
-          count,
-          startSeq,
-          grade,
-          week,
-          skill,
-          dMin,
-        };
-        const result =
-          mode === "audio_choice"
-            ? generateAudioChoiceFromVocab(imgAssets, genOpts)
-            : mode === "image_choice"
-              ? generateImageChoiceFromVocab(imgAssets, genOpts)
-              : generateLetterFromVocab(imgAssets, genOpts);
-        qs = result.questions;
-        rpt = result.report;
-      } else {
-        const range: [number, number] = [Math.min(dMin, dMax), Math.max(dMin, dMax)];
-        const result = await generateEnglishQuestionsWithProgress(
-          {
-            grade,
-            week,
-            skill,
-            blueprintType: blueprint,
-            count,
-            difficultyRange: range,
-            options: { useAIWording: false, seed: Date.now(), wordList: [] },
-          },
-          (current, total) => setProgress(Math.round((current / total) * 100)),
-        );
-        qs = result.questions;
-        rpt = result.report;
-      }
+      if (!selectedLesson) throw new Error("Chưa chọn bài học.");
+      const imgAssets = await assetsApi.list({ type: "image" });
+      const genOpts: VocabGenOpts = {
+        selectedLesson,
+        allLessons: lessons,
+        count,
+        startSeq,
+        grade,
+        week,
+        skill,
+        dMin,
+      };
+      const { questions: qs, report: rpt } =
+        mode === "audio_choice"
+          ? generateAudioChoiceFromVocab(imgAssets, genOpts)
+          : mode === "image_choice"
+            ? generateImageChoiceFromVocab(imgAssets, genOpts)
+            : generateLetterFromVocab(imgAssets, genOpts);
 
       setQuestions(qs);
       setReport(rpt);
@@ -411,7 +376,7 @@ export default function AiGeneratePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Số câu (1-50)</Label>
                 <Input
@@ -424,12 +389,8 @@ export default function AiGeneratePage() {
                 />
               </div>
               <div>
-                <Label className="text-xs">Độ khó từ</Label>
+                <Label className="text-xs">Độ khó</Label>
                 <Input type="number" min={1} max={3} value={dMin} onChange={(e) => setDMin(Number(e.target.value))} className="mt-1" />
-              </div>
-              <div>
-                <Label className="text-xs">Đến</Label>
-                <Input type="number" min={1} max={3} value={dMax} onChange={(e) => setDMax(Number(e.target.value))} className="mt-1" />
               </div>
             </div>
 
