@@ -11,7 +11,7 @@ function _imagePath(grade: number, word: string | null, seed?: number): string |
   if (!word) return null;
   const safeWord = word.toLowerCase().replace(/\s+/g, "_");
   const variant = typeof seed === "number" ? (Math.abs(seed) % 3) + 1 : 1;
-  return `assets/images/grade${grade}/english/${safeWord}_${variant}.png`;
+  return `assets/images/grade${grade}/english/${safeWord}_${variant}.webp`;
 }
 
 function _audioPath(grade: number, word: string | null): string | null {
