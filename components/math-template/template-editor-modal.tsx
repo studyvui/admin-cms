@@ -38,6 +38,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lessonType: string;
+  /** Lớp đang chọn ở trang cha — lưu vào template mới, KHÔNG hardcode lớp 1. */
+  grade: number;
   editing: ServerTemplate | null;
   /** Prefill khi sao chép built-in thành mẫu mới (không có id → tạo mới). */
   initial?: TemplateInput | null;
@@ -71,7 +73,7 @@ function rowsToVars(rows: VarRow[]): TemplateVar[] {
   );
 }
 
-export function TemplateEditorModal({ open, onOpenChange, lessonType, editing, initial, allowedSkills, saving, onSubmit }: Props) {
+export function TemplateEditorModal({ open, onOpenChange, lessonType, grade, editing, initial, allowedSkills, saving, onSubmit }: Props) {
   const skillOptions = useMemo(
     () => (allowedSkills && allowedSkills.length > 0 ? allowedSkills : Object.keys(SKILL_LABELS)),
     [allowedSkills],
@@ -124,7 +126,7 @@ export function TemplateEditorModal({ open, onOpenChange, lessonType, editing, i
   const buildInput = (): TemplateInput => ({
     lessonType,
     skill,
-    grade: 1,
+    grade,
     text: text.trim(),
     formula: formula.trim(),
     condition: condition.trim() || undefined,
@@ -139,7 +141,7 @@ export function TemplateEditorModal({ open, onOpenChange, lessonType, editing, i
     }
     setError(null);
     const t: MathTemplate = { id: "PREVIEW", source: "user", ...buildInput() };
-    const q = generateOne(t, 1, 1, 2);
+    const q = generateOne(t, grade, 1, 2);
     setPreview({ text: q.text, options: q.options, answer: q.correct_answer });
   };
 

@@ -51,6 +51,9 @@ export default function LessonsPage() {
   }>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Lesson | null>(null);
+  // Danh sách bài học nhiều lớp/môn — chỉ tải khi bấm "Hiển thị"; đổi bộ lọc lại
+  // phải bấm lại (tránh vô tình tải "Tất cả" gây lag mỗi lần đổi ý).
+  const [showResults, setShowResults] = useState(false);
 
   const {
     courses,
@@ -61,7 +64,7 @@ export default function LessonsPage() {
     updateMut,
     statusMut,
     deleteMut,
-  } = useLessons(filters);
+  } = useLessons(filters, showResults);
 
   if (!hydrated) return null;
   if (!hasRole("admin", "editor", "qa")) {
@@ -103,17 +106,22 @@ export default function LessonsPage() {
             Cấu trúc tuần học, lesson type và status workflow
           </p>
         </div>
-        {canWrite && (
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm bài học
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowResults(true)}>
+            Hiển thị
           </Button>
-        )}
+          {canWrite && (
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Thêm bài học
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -126,12 +134,13 @@ export default function LessonsPage() {
               <Label className="mb-1.5 block text-xs">Khoá học</Label>
               <Select
                 value={filters.courseId ?? "all"}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
                   setFilters((f) => ({
                     ...f,
                     courseId: v === "all" ? undefined : v,
-                  }))
-                }
+                  }));
+                  setShowResults(false);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Tất cả" />
@@ -150,12 +159,13 @@ export default function LessonsPage() {
               <Label className="mb-1.5 block text-xs">Trạng thái</Label>
               <Select
                 value={filters.status ?? "all"}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
                   setFilters((f) => ({
                     ...f,
                     status: v === "all" ? undefined : (v as LessonStatus),
-                  }))
-                }
+                  }));
+                  setShowResults(false);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Tất cả" />
@@ -176,12 +186,13 @@ export default function LessonsPage() {
                 type="number"
                 placeholder="Để trống = tất cả"
                 value={filters.week ?? ""}
-                onChange={(e) =>
+                onChange={(e) => {
                   setFilters((f) => ({
                     ...f,
                     week: e.target.value || undefined,
-                  }))
-                }
+                  }));
+                  setShowResults(false);
+                }}
               />
             </div>
           </div>
@@ -191,11 +202,16 @@ export default function LessonsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
-            Danh sách ({lessons?.length ?? 0})
+            Danh sách {showResults ? `(${lessons?.length ?? 0})` : ""}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {!showResults ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Chọn bộ lọc rồi bấm <b>Hiển thị</b> để tải bài học — danh sách có
+              nhiều lớp/môn nên không tự tải để tránh giật/lag.
+            </p>
+          ) : isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />

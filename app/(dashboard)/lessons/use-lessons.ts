@@ -16,7 +16,7 @@ export interface LessonFilters {
   week?: string;
 }
 
-export function useLessons(filters: LessonFilters) {
+export function useLessons(filters: LessonFilters, enabled: boolean = true) {
   const queryClient = useQueryClient();
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["lessons"] });
@@ -26,6 +26,8 @@ export function useLessons(filters: LessonFilters) {
     queryFn: coursesApi.list,
   });
 
+  // Chỉ tải danh sách bài học khi người dùng bấm "Hiển thị" (tránh tự động tải
+  // toàn bộ bài học mọi lớp/môn mỗi lần vào trang — xem questions/page.tsx tương tự).
   const lessonsQuery = useQuery({
     queryKey: ["lessons", filters],
     queryFn: () =>
@@ -34,6 +36,7 @@ export function useLessons(filters: LessonFilters) {
         status: filters.status,
         week: filters.week ? parseInt(filters.week, 10) : undefined,
       }),
+    enabled,
   });
 
   const createMut = useMutation({

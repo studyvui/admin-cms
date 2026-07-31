@@ -57,6 +57,9 @@ export default function QuestionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Question | null>(null);
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  // Danh sách > 6000 câu hỏi — chỉ tải khi bấm "Hiển thị"; đổi bộ lọc lại phải
+  // bấm lại (tránh vô tình tải "Tất cả" gây lag mỗi lần đổi ý).
+  const [showResults, setShowResults] = useState(false);
 
   const {
     courses,
@@ -69,7 +72,7 @@ export default function QuestionsPage() {
     statusMut,
     deleteMut,
     restoreMut,
-  } = useQuestions(filters);
+  } = useQuestions(filters, showResults);
 
   const filteredLessons = useMemo(() => {
     if (!lessons) return [];
@@ -142,17 +145,22 @@ export default function QuestionsPage() {
             Nhập, sửa, duyệt và xuất bản câu hỏi
           </p>
         </div>
-        {canWrite && (
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm câu hỏi
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowResults(true)}>
+            Hiển thị
           </Button>
-        )}
+          {canWrite && (
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Thêm câu hỏi
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -168,6 +176,7 @@ export default function QuestionsPage() {
                 onValueChange={(v) => {
                   const newCourseId = v === "all" ? undefined : v;
                   setSelectedCourseId(newCourseId);
+                  setShowResults(false);
                   // Reset lesson filter nếu lesson không thuộc course mới
                   if (filters.lessonId && newCourseId) {
                     const lesson = lessons?.find((l) => l.id === filters.lessonId);
@@ -194,12 +203,13 @@ export default function QuestionsPage() {
               <Label className="mb-1.5 block text-xs">Bài học</Label>
               <Select
                 value={filters.lessonId ?? "all"}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
                   setFilters((f) => ({
                     ...f,
                     lessonId: v === "all" ? undefined : v,
-                  }))
-                }
+                  }));
+                  setShowResults(false);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Tất cả" />
@@ -218,12 +228,13 @@ export default function QuestionsPage() {
               <Label className="mb-1.5 block text-xs">Trạng thái</Label>
               <Select
                 value={filters.status ?? "all"}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
                   setFilters((f) => ({
                     ...f,
                     status: v === "all" ? undefined : (v as QuestionStatus),
-                  }))
-                }
+                  }));
+                  setShowResults(false);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Tất cả" />
@@ -243,12 +254,13 @@ export default function QuestionsPage() {
               <Input
                 placeholder="vocab, phonics, ..."
                 value={filters.skill ?? ""}
-                onChange={(e) =>
+                onChange={(e) => {
                   setFilters((f) => ({
                     ...f,
                     skill: e.target.value || undefined,
-                  }))
-                }
+                  }));
+                  setShowResults(false);
+                }}
               />
             </div>
           </div>
@@ -258,11 +270,16 @@ export default function QuestionsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
-            Danh sách ({displayedQuestions.length})
+            Danh sách {showResults ? `(${displayedQuestions.length})` : ""}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {!showResults ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Chọn bộ lọc rồi bấm <b>Hiển thị</b> để tải câu hỏi — danh sách có
+              hàng nghìn câu nên không tự tải để tránh giật/lag.
+            </p>
+          ) : isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />

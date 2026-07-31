@@ -16,7 +16,7 @@ export interface QuestionFilters {
   skill?: string;
 }
 
-export function useQuestions(filters: QuestionFilters) {
+export function useQuestions(filters: QuestionFilters, enabled: boolean = true) {
   const queryClient = useQueryClient();
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["questions"] });
@@ -31,9 +31,12 @@ export function useQuestions(filters: QuestionFilters) {
     queryFn: () => lessonsApi.list(),
   });
 
+  // Danh sách câu hỏi hiện > 6000 bản ghi — chỉ tải khi người dùng bấm "Hiển thị"
+  // (tránh lag do tự động tải toàn bộ mỗi lần vào trang, xem question-dialog page.tsx).
   const questionsQuery = useQuery({
     queryKey: ["questions", filters],
     queryFn: () => questionsApi.list(filters),
+    enabled,
   });
 
   const createMut = useMutation({

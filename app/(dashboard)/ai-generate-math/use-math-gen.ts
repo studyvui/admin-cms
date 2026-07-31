@@ -29,10 +29,10 @@ export function useMathGen({ grade, week }: { grade: number; week: number }) {
   const lessonType = currentLesson?.lessonType ?? "";
   const allowedSkills = currentLesson?.skills ?? [];
 
-  // Ngân hàng mẫu (user) lọc theo lessonType của tuần.
+  // Ngân hàng mẫu (user) lọc theo lessonType + lớp của tuần.
   const { data: userTemplates = [], isLoading } = useQuery({
-    queryKey: ["question-templates", lessonType],
-    queryFn: () => questionTemplatesApi.list({ lessonType }),
+    queryKey: ["question-templates", lessonType, grade],
+    queryFn: () => questionTemplatesApi.list({ lessonType, grade }),
     enabled: !!lessonType,
   });
 

@@ -28,6 +28,15 @@ export const LESSON_TYPE_LABELS: Record<string, string> = {
   phonics: "Phonics",
   review: "Ôn tập",
   boss: "Boss Challenge",
+  length_measurement: "Đo độ dài",
+  telling_time: "Xem giờ",
+  calendar_reading: "Xem lịch, thứ trong tuần",
+  multiplication: "Phép nhân",
+  division: "Phép chia",
+  money: "Tiền Việt Nam",
+  probability: "Xác suất đơn giản",
+  data_read: "Đọc biểu đồ / bảng số liệu",
+  measurement: "Đo lường (kg/lít)",
 };
 
 export const SKILL_LABELS: Record<string, string> = {
@@ -51,6 +60,13 @@ export const SKILL_LABELS: Record<string, string> = {
   vocab: "Từ vựng",
   listening: "Nghe",
   phonics: "Phonics",
+  measurement: "Đo lường",
+  time_reasoning: "Suy luận thời gian",
+  multiplication: "Phép nhân",
+  division: "Phép chia",
+  money: "Tiền tệ",
+  probability: "Xác suất",
+  data_read: "Đọc dữ liệu",
 };
 
 export function lessonTypeLabel(key: string): string {

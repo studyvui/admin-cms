@@ -19,6 +19,7 @@ import {
   pairKey,
   pairFromKey,
 } from "@/lib/questions/sentence-bank";
+import { getMathArchetypes } from "@/lib/questions/math-archetypes-grade1";
 import {
   questionFormSchema,
   toFormValues,
@@ -132,6 +133,36 @@ export function QuestionDialog({
       /_ENG/i.test(lessons.find((l) => l.id === watchedLessonId)?.code ?? ""),
     [watchedLessonId, lessons],
   );
+
+  // Bài học Toán (code chứa "_MATH") → "Loại câu hỏi" chuyển thành đúng "Dạng bài"
+  // của node/tuần đó (catalog bám SGK, hiện chỉ có Lớp 1 — Lớp 2-5 chờ đọc SGK nên
+  // trả mảng rỗng, dropdown tự rơi về danh sách Loại câu hỏi chung như cũ).
+  const watchedLessonCode = useMemo(
+    () => lessons.find((l) => l.id === watchedLessonId)?.code ?? "",
+    [watchedLessonId, lessons],
+  );
+  const mathArchetypes = useMemo(
+    () => getMathArchetypes(watchedLessonCode),
+    [watchedLessonCode],
+  );
+  // Chỉ bật cho câu MỚI (không phá luồng sửa câu cũ đã có type/skill riêng).
+  const useMathArchetypes = !editing && mathArchetypes.length > 0;
+  const [archetypeIdx, setArchetypeIdx] = useState<string>("");
+  useEffect(() => {
+    setArchetypeIdx("");
+  }, [watchedLessonId]);
+  const selectedArchetype =
+    archetypeIdx !== "" ? mathArchetypes[Number(archetypeIdx)] : undefined;
+  const archetypeIcon = (feas: string) =>
+    feas === "image" ? "🖼️ " : feas === "engine" ? "🛠️ " : "🔢 ";
+
+  // Skill cho bài Toán có Dạng bài: danh sách CỐ ĐỊNH (không đổi Input↔Select giữa
+  // chừng khi chọn Dạng bài — tránh Select mất giá trị vì đổi loại component).
+  // Options = mọi skill (2 từ, tiếng Việt) xuất hiện trong catalog của bài học đó.
+  const mathSkillOptions = useMemo(() => {
+    if (!useMathArchetypes) return [];
+    return Array.from(new Set(mathArchetypes.map((a) => a.skill)));
+  }, [useMathArchetypes, mathArchetypes]);
 
   // Danh sách mode hiển thị trong dropdown "Chế độ nhập".
   const availableModes = useMemo(() => {
@@ -309,28 +340,72 @@ export function QuestionDialog({
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Loại câu hỏi</Label>
+              <Label>
+                {useMathArchetypes ? "Loại câu hỏi (Dạng bài theo SGK)" : "Loại câu hỏi"}
+              </Label>
               <Select
-                value={watch("type")}
-                onValueChange={(v) =>
-                  setValue("type", v, { shouldValidate: true })
-                }
+                value={useMathArchetypes ? archetypeIdx : watch("type")}
+                onValueChange={(v) => {
+                  if (useMathArchetypes) {
+                    setArchetypeIdx(v);
+                    const a = mathArchetypes[Number(v)];
+                    if (a) {
+                      setValue("type", a.label, { shouldValidate: true });
+                      setValue("skill", a.skill, { shouldValidate: true });
+                    }
+                  } else {
+                    setValue("type", v, { shouldValidate: true });
+                  }
+                }}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue
+                    placeholder={useMathArchetypes ? "Chọn dạng bài..." : undefined}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {QUESTION_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {QUESTION_TYPE_LABELS[t] ?? t}
-                    </SelectItem>
-                  ))}
+                  {useMathArchetypes
+                    ? mathArchetypes.map((a, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          {archetypeIcon(a.feas)}
+                          {a.label}
+                        </SelectItem>
+                      ))
+                    : QUESTION_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {QUESTION_TYPE_LABELS[t] ?? t}
+                        </SelectItem>
+                      ))}
                 </SelectContent>
               </Select>
+              {useMathArchetypes && selectedArchetype && (
+                <p className="text-xs text-muted-foreground">
+                  Skill đã tự điền: <b>{selectedArchetype.skill}</b> · gợi ý đề
+                  bài/đáp án đã điền vào ô placeholder bên dưới.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="skill">Skill</Label>
-              {!editing && lessonSkills.length > 0 ? (
+              {useMathArchetypes ? (
+                <Select
+                  value={watch("skill")}
+                  onValueChange={(v) =>
+                    setValue("skill", v, { shouldValidate: true })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn Loại câu hỏi (Dạng bài) trước" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mathSkillOptions.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : !editing && lessonSkills.length > 0 ? (
                 <Select
                   value={watch("skill")}
                   onValueChange={(v) =>
@@ -394,16 +469,17 @@ export function QuestionDialog({
                 <Textarea
                   id="prompt"
                   rows={2}
-                  placeholder="Which is apple?"
+                  placeholder={selectedArchetype?.promptHint || "Which is apple?"}
                   {...register("prompt" as const)}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {(["A", "B", "C", "D"] as const).map((k) => (
+                {(["A", "B", "C", "D"] as const).map((k, idx) => (
                   <div key={k} className="space-y-2">
                     <Label htmlFor={`option${k}`}>Lựa chọn {k}</Label>
                     <Input
                       id={`option${k}`}
+                      placeholder={selectedArchetype?.optionHints?.[idx]}
                       {...register(`option${k}` as const)}
                     />
                     <AssetField
