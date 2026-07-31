@@ -3,8 +3,6 @@ import { SidebarNav } from "@/components/shared/sidebar-nav";
 import { Topbar } from "@/components/shared/topbar";
 import { AuthGuard } from "@/components/shared/auth-guard";
 
-export const runtime = "edge";
-
 export default function DashboardLayout({
   children,
 }: {
