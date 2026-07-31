@@ -31,6 +31,7 @@ test("danh sách câu hỏi render từ dữ liệu (mock)", async ({ page }) =>
   await setup(page);
   await page.goto("/questions");
   await expect(page.getByRole("heading", { name: "Câu hỏi" })).toBeVisible();
+  await page.getByRole("button", { name: "Hiển thị" }).click();
   await expect(page.getByText("G1_W01_1_ENG_001")).toBeVisible();
   await expect(page.getByText("G1_W01_1_ENG_005")).toBeVisible();
 });
@@ -110,6 +111,7 @@ test.describe("Sửa câu → form nạp lại đúng (round-trip UI)", () => {
     test(`mode ${q.type}`, async ({ page }) => {
       await setup(page);
       await page.goto("/questions");
+      await page.getByRole("button", { name: "Hiển thị" }).click();
       // Bấm nút Sửa (icon) trên đúng hàng câu hỏi.
       const row = page.getByRole("row", { name: new RegExp(q.code as string) });
       await row.getByRole("button", { name: "Sửa câu hỏi" }).click();
@@ -138,6 +140,7 @@ test("nút Khôi phục ở câu deprecated → chạy chuỗi changeStatus", as
 }) => {
   const api = await setup(page);
   await page.goto("/questions");
+  await page.getByRole("button", { name: "Hiển thị" }).click();
   const row = page.getByRole("row", { name: /G1_W01_1_ENG_005/ });
   await row.getByRole("button", { name: "Khôi phục" }).click();
 

@@ -22,6 +22,7 @@ test("danh sách bài học render từ dữ liệu (mock)", async ({ page }) =>
   await setup(page);
   await page.goto("/lessons");
   await expect(page.getByRole("heading", { name: "Bài học" })).toBeVisible();
+  await page.getByRole("button", { name: "Hiển thị" }).click();
   await expect(page.getByText("G1_W01_1_ENG")).toBeVisible();
   await expect(page.getByText("Lời chào")).toBeVisible();
 });
@@ -64,6 +65,7 @@ test("tạo bài học → mã tự sinh G1_W01_1_ENG + POST payload đúng (bui
 test("sửa bài học → form nạp lại đúng (toFormValues)", async ({ page }) => {
   await setup(page);
   await page.goto("/lessons");
+  await page.getByRole("button", { name: "Hiển thị" }).click();
   const row = page.getByRole("row", { name: /G1_W01_1_ENG/ });
   await row.getByRole("button", { name: "Sửa bài học" }).click();
 
