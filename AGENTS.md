@@ -109,8 +109,9 @@ components/            # field/modal DÙNG CHUNG nhiều trang (vd form-fields/a
   (bằng chứng không đổi hành vi).
 - Selector ổn định: `getByRole`/`getByLabel`/`getByText`. Mode-select có `aria-label`; emoji trong help text
   là marker phân biệt mode tiện assert.
-- **Cổng đầy đủ trước khi commit:** `npm test` + `npx tsc --noEmit` + `npm run build` + `npx next lint` +
-  `npm run test:e2e` — tất cả xanh.
+- **Cổng đầy đủ trước khi commit:** `npm test` + `npx tsc --noEmit` + `npm run build` + `npx eslint .` +
+  `npm run test:e2e` — tất cả xanh. (Next 16 đã gỡ `next lint`, dùng ESLint flat config trực tiếp qua
+  `eslint.config.mjs`; build không còn chạy lint kèm theo, nên lỗi lint không chặn `npm run build`.)
 
 ## Auth flow
 

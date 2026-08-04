@@ -35,7 +35,8 @@ components/           # field/component DÙNG CHUNG nhiều trang.
 
 ## Cổng đầy đủ TRƯỚC KHI COMMIT
 
-`npm test` · `npx tsc --noEmit` · `npm run build` · `npx next lint` · `npm run test:e2e` — TẤT CẢ phải xanh.
+`npm test` · `npx tsc --noEmit` · `npm run build` · `npx eslint .` · `npm run test:e2e` — TẤT CẢ phải xanh.
+(Next 16 đã gỡ `next lint`, dùng ESLint flat config `eslint.config.mjs`; build không còn kèm lint.)
 > Chạy e2e: tắt `npm run dev` đang chạy (nếu có) để Playwright tự khởi động server.
 
 ## Deploy
