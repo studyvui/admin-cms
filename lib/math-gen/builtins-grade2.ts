@@ -167,7 +167,11 @@ function giaiToanHonKem(min: number, max: number): Gen {
     while (n2 === n1) n2 = names[rnd(0, 3)];
     const a = rnd(min, max);
     const b = rnd(1, 20);
-    const text = tpl.replace("{name1}", n1).replace("{name2}", n2).replace("{a}", String(a)).replace("{b}", String(b));
+    const text = tpl
+      .replaceAll("{name1}", n1)
+      .replaceAll("{name2}", n2)
+      .replaceAll("{a}", String(a))
+      .replaceAll("{b}", String(b));
     return mcNumeric(text, op === "+" ? a + b : a - b);
   };
 }
@@ -289,8 +293,9 @@ function giaiToanDonVi(unit: string): Gen {
   const label = unit === "kg" ? "cân nặng" : "chứa";
   return () => {
     const a = rnd(10, 60);
-    const b = rnd(2, 20);
     const isHon = Math.random() < 0.5;
+    // "nhẹ hơn" (trừ) phải đảm bảo b < a — khối lượng/dung tích không thể ra số âm.
+    const b = isHon ? rnd(2, 20) : rnd(2, Math.min(20, a - 1));
     const text = `Vật A ${label} ${a}${unit}, vật B ${isHon ? "nặng hơn" : "nhẹ hơn"} vật A ${b}${unit}. Hỏi vật B ${label} bao nhiêu ${unit}?`;
     return mcNumeric(text, isHon ? a + b : a - b);
   };
@@ -921,8 +926,13 @@ export const GRADE2_BUILTIN_TEMPLATES: MathTemplate[] = [
   // W09 — Lít
   T("TPL_G2_W09_A", "number_decompose", "number_recognition", "Đọc số lít viết bằng chữ", () => {
     const n = rnd(2, 20);
-    const words = ["một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười"];
-    const w = n <= 10 ? words[n - 1] : `${words[Math.floor(n / 10) - 1]} mươi`;
+    // Đọc số tiếng Việt 2-20: "mười" đứng trước hàng đơn vị của 11-19 (không phải
+    // "một mươi" — cách đó chỉ dùng cho 20, 30...); "lăm" thay "năm" sau "mười".
+    const donVi = ["", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+    let w: string;
+    if (n <= 10) w = ["", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười"][n];
+    else if (n < 20) w = `mười ${n % 10 === 5 ? "lăm" : donVi[n % 10]}`;
+    else w = "hai mươi";
     return mcNumeric(`"${w.charAt(0).toUpperCase() + w.slice(1)} lít" là bao nhiêu lít?`, n, 3);
   }),
   T("TPL_G2_W09_B", "measurement", "measurement", "Tính cộng/trừ đơn vị lít", tinhDonVi("l", 1, 30)),

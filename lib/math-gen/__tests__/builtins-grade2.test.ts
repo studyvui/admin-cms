@@ -122,3 +122,52 @@ describe("Kiểm logic đúng cho vài archetype tiêu biểu (không chỉ hìn
     }
   });
 });
+
+// Hồi quy 3 lỗi phát hiện trên 388 câu đã publish (2026-08-05, xem PLAN/TOÁN/lop2_dump ở repo
+// STUDYVUI): placeholder {name1}/{name2} rò rỉ ra đề bài, đọc số 11-19 sai thành "một mươi",
+// và bài toán "nhẹ hơn" ra khối lượng/dung tích âm.
+describe("giaiToanHonKem — không còn rò rỉ {name1}/{name2}/{a}/{b} (bug replace không global)", () => {
+  const ids = ["TPL_G2_W02_C", "TPL_G2_W07_C", "TPL_G2_W07_D", "TPL_G2_W12_C"];
+  for (const id of ids) {
+    it(`${id}: 40 lần sinh đều không còn dấu {`, () => {
+      const tpl = GRADE2_BUILTIN_TEMPLATES.find((t) => t.id === id)!;
+      for (let i = 0; i < 40; i++) {
+        const r = tpl.builtinGenerator!(2, 1);
+        expect(r.text).not.toMatch(/\{[a-zA-Z0-9]+\}/);
+      }
+    });
+  }
+});
+
+describe("giaiToanDonVi — \"nhẹ hơn\" không còn ra khối lượng/dung tích âm", () => {
+  const ids = ["TPL_G2_W08_C", "TPL_G2_W09_C", "TPL_G2_W30_B"];
+  for (const id of ids) {
+    it(`${id}: 60 lần sinh, đáp án và mọi lựa chọn đều >= 0`, () => {
+      const tpl = GRADE2_BUILTIN_TEMPLATES.find((t) => t.id === id)!;
+      for (let i = 0; i < 60; i++) {
+        const r = tpl.builtinGenerator!(2, 1);
+        expect(Number(r.correct_answer)).toBeGreaterThanOrEqual(0);
+        for (const opt of r.options) expect(Number(opt)).toBeGreaterThanOrEqual(0);
+      }
+    });
+  }
+});
+
+describe("TPL_G2_W09_A — đọc số 11-19 đúng \"mười X\" (không còn \"một mươi\" sai)", () => {
+  it("40 lần sinh: số trong đề khớp đúng cách đọc tiếng Việt", () => {
+    const tpl = GRADE2_BUILTIN_TEMPLATES.find((t) => t.id === "TPL_G2_W09_A")!;
+    const wordFor = (n: number): string => {
+      if (n <= 10) return ["", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười"][n];
+      if (n < 20) return `mười ${n % 10 === 5 ? "lăm" : ["", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"][n % 10]}`;
+      return "hai mươi";
+    };
+    for (let i = 0; i < 40; i++) {
+      const r = tpl.builtinGenerator!(2, 1);
+      const n = Number(r.correct_answer);
+      const expectedWord = wordFor(n);
+      const expectedCap = expectedWord.charAt(0).toUpperCase() + expectedWord.slice(1);
+      expect(r.text).toBe(`"${expectedCap} lít" là bao nhiêu lít?`);
+      expect(r.text).not.toContain("một mươi");
+    }
+  });
+});
