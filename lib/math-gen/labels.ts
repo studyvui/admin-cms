@@ -37,6 +37,13 @@ export const LESSON_TYPE_LABELS: Record<string, string> = {
   probability: "Xác suất đơn giản",
   data_read: "Đọc biểu đồ / bảng số liệu",
   measurement: "Đo lường (kg/lít)",
+  perimeter: "Chu vi hình học",
+  area: "Diện tích hình học",
+  rounding: "Làm tròn số",
+  roman_numeral: "Số La Mã",
+  fraction: "Phân số",
+  fraction_operations: "Phép tính với phân số",
+  estimation: "Ước lượng nhanh",
 };
 
 export const SKILL_LABELS: Record<string, string> = {
@@ -67,6 +74,14 @@ export const SKILL_LABELS: Record<string, string> = {
   money: "Tiền tệ",
   probability: "Xác suất",
   data_read: "Đọc dữ liệu",
+  perimeter: "Chu vi",
+  area: "Diện tích",
+  rounding: "Làm tròn",
+  roman_numeral: "Số La Mã",
+  fraction: "Phân số",
+  fraction_operations: "Phép tính phân số",
+  estimation: "Ước lượng",
+  average: "Trung bình cộng",
 };
 
 export function lessonTypeLabel(key: string): string {
