@@ -33,6 +33,7 @@ import { getBuiltinsForLessonType } from "@/lib/math-gen/builtins";
 import { getGrade2BuiltinsForLessonType } from "@/lib/math-gen/builtins-grade2";
 import { getGrade3BuiltinsForLessonType } from "@/lib/math-gen/builtins-grade3";
 import { getGrade4BuiltinsForLessonType } from "@/lib/math-gen/builtins-grade4";
+import { getGrade5BuiltinsForLessonType } from "@/lib/math-gen/builtins-grade5";
 import { serverToTemplate } from "@/lib/math-gen/page-helpers";
 import { useMathGen } from "./use-math-gen";
 import { generateBatch } from "@/lib/math-gen/generate";
@@ -82,15 +83,16 @@ export default function AiGenerateMathPage() {
   } = useMathGen({ grade, week });
 
   // ── Templates: built-in + user (backend), lọc theo lessonType của tuần ──
-  // Built-in Lớp 1/2/3/4 nằm ở 4 registry riêng (builtins.ts / builtins-grade2.ts /
-  // builtins-grade3.ts / builtins-grade4.ts) vì phạm vi số mỗi lớp khác hẳn nhau —
-  // Lớp 5 chưa có nên trả mảng rỗng (chờ đọc SGK).
+  // Built-in Lớp 1-5 nằm ở 5 registry riêng (builtins.ts / builtins-grade2.ts /
+  // builtins-grade3.ts / builtins-grade4.ts / builtins-grade5.ts) vì phạm vi số
+  // mỗi lớp khác hẳn nhau. Lớp 5 là lớp cuối lộ trình 5 lớp (2026-08-13).
   const builtins = useMemo(() => {
     if (!lessonType) return [];
     if (grade === 1) return getBuiltinsForLessonType(lessonType, 1);
     if (grade === 2) return getGrade2BuiltinsForLessonType(lessonType);
     if (grade === 3) return getGrade3BuiltinsForLessonType(lessonType);
     if (grade === 4) return getGrade4BuiltinsForLessonType(lessonType);
+    if (grade === 5) return getGrade5BuiltinsForLessonType(lessonType);
     return [];
   }, [lessonType, grade]);
   const allTemplates: MathTemplate[] = useMemo(

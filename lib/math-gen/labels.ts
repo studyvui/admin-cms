@@ -44,6 +44,11 @@ export const LESSON_TYPE_LABELS: Record<string, string> = {
   fraction: "Phân số",
   fraction_operations: "Phép tính với phân số",
   estimation: "Ước lượng nhanh",
+  decimal: "Số thập phân",
+  ratio: "Tỉ số",
+  percentage: "Tỉ số phần trăm",
+  volume: "Thể tích",
+  speed: "Vận tốc, quãng đường, thời gian",
 };
 
 export const SKILL_LABELS: Record<string, string> = {
@@ -82,6 +87,11 @@ export const SKILL_LABELS: Record<string, string> = {
   fraction_operations: "Phép tính phân số",
   estimation: "Ước lượng",
   average: "Trung bình cộng",
+  decimal: "Số thập phân",
+  ratio: "Tỉ số",
+  percentage: "Tỉ số phần trăm",
+  volume: "Thể tích",
+  speed: "Vận tốc",
 };
 
 export function lessonTypeLabel(key: string): string {
