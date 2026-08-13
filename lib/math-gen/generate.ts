@@ -18,6 +18,8 @@ export interface GenerateOpts {
   count: number;
   /** ghi đè lessonType (vd built-in dùng dưới lesson type khác). */
   lessonType?: string;
+  /** override range số cho builtinGenerator (vd start/step của mẫu Dãy số) — admin chỉnh qua UI. */
+  builtinParams?: Record<string, number>;
 }
 
 /** Sinh 1 câu hỏi từ template. */
@@ -27,6 +29,7 @@ export function generateOne(
   week: number,
   difficulty: number,
   lessonType?: string,
+  builtinParams?: Record<string, number>,
 ): GeneratedMathQuestion {
   let text: string;
   let options: string[];
@@ -35,7 +38,7 @@ export function generateOne(
   let vars: Record<string, string | number> = {};
 
   if (template.source === "builtin" && template.builtinGenerator) {
-    const raw = template.builtinGenerator(grade, difficulty);
+    const raw = template.builtinGenerator(grade, difficulty, builtinParams);
     text = raw.text;
     options = raw.options;
     correct = raw.correct_answer;
@@ -84,7 +87,7 @@ export function generateBatch(
     const difficulty = (i % 3) + 1;
     let placed = false;
     for (let attempt = 0; attempt < 8; attempt++) {
-      const q = generateOne(template, opts.grade, opts.week, difficulty, opts.lessonType);
+      const q = generateOne(template, opts.grade, opts.week, difficulty, opts.lessonType, opts.builtinParams);
       const sig = signature(q);
       if (seen.has(sig)) {
         report.skipped_dup++;
@@ -98,7 +101,7 @@ export function generateBatch(
     }
     // nếu không tránh được trùng (miền giá trị quá nhỏ) → vẫn nhận câu cuối
     if (!placed) {
-      const q = generateOne(template, opts.grade, opts.week, difficulty, opts.lessonType);
+      const q = generateOne(template, opts.grade, opts.week, difficulty, opts.lessonType, opts.builtinParams);
       questions.push(q);
       report.generated++;
     }

@@ -10,6 +10,7 @@ import {
 import { generateBatch, generateOne } from "../generate";
 import { getBuiltinsForLessonType, getAllBuiltins } from "../builtins";
 import { toBulkRows } from "../export-xlsx";
+import { skillLabel } from "../labels";
 import type { MathTemplate, TemplateVar } from "../types";
 
 describe("resolveVarValue", () => {
@@ -178,6 +179,19 @@ describe("built-in templates", () => {
       expect(q.options).toContain(q.correct_answer);
     }
   });
+
+  it("mẫu Dãy số nhận builtinParams (start/step) chỉnh qua UI, không phá default khi không truyền", () => {
+    const seqTpl = getBuiltinsForLessonType("sequence").find((t) => t.id === "TPL_SEQ_01");
+    expect(seqTpl?.builtinGenerator).toBeTypeOf("function");
+    for (let i = 0; i < 20; i++) {
+      const q = generateOne(seqTpl!, 1, 1, 1, undefined, { startMin: 5, startMax: 5, stepMin: 2, stepMax: 2 });
+      expect(q.text).toContain("5, 7, 9, 11");
+    }
+    // không truyền params → vẫn dùng default cũ (start 0-19, step 1-5), không lỗi
+    const qDefault = generateOne(seqTpl!, 1, 1, 1);
+    expect(qDefault.text.length).toBeGreaterThan(0);
+    expect(qDefault.options).toContain(qDefault.correct_answer);
+  });
 });
 
 describe("toBulkRows export", () => {
@@ -207,6 +221,7 @@ describe("toBulkRows export", () => {
       const idx = ["A", "B", "C", "D"].indexOf(r.correct);
       expect(idx).toBeGreaterThanOrEqual(0);
       expect(new Set(opts).size).toBe(4);
+      expect(r.skill).toBe(skillLabel(tpl.skill));
     }
   });
 

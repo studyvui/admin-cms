@@ -48,8 +48,12 @@ export interface MathTemplate {
   condition?: string;
   vars: TemplateVar[];
   distractorCount: number;
-  /** chỉ built-in dạng imperative (vd sequence): hàm sinh trực tiếp. */
-  builtinGenerator?: (grade: number, difficulty: number) => RawGenerated;
+  /**
+   * chỉ built-in dạng imperative (vd sequence): hàm sinh trực tiếp.
+   * `params` tuỳ chọn: override range số (vd start/step của Dãy số) do admin chỉnh qua UI,
+   * không đổi hành vi khi không truyền (mặc định hardcode trong generator).
+   */
+  builtinGenerator?: (grade: number, difficulty: number, params?: Record<string, number>) => RawGenerated;
 }
 
 /** Kết quả thô từ generator built-in. */

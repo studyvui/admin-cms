@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { extractError } from "@/lib/errors";
 import { getBuiltinsForLessonType } from "@/lib/math-gen/builtins";
+import { getGrade1ShapeBuiltinsForLessonType } from "@/lib/math-gen/builtins-grade1-shapes";
 import { getGrade2BuiltinsForLessonType } from "@/lib/math-gen/builtins-grade2";
 import { getGrade3BuiltinsForLessonType } from "@/lib/math-gen/builtins-grade3";
 import { getGrade4BuiltinsForLessonType } from "@/lib/math-gen/builtins-grade4";
@@ -40,6 +41,11 @@ import { generateBatch } from "@/lib/math-gen/generate";
 import { toBulkRows, downloadBulkXlsx } from "@/lib/math-gen/export-xlsx";
 import { lessonTypeLabel, skillLabel } from "@/lib/math-gen/labels";
 import { TemplateEditorModal } from "@/components/math-template/template-editor-modal";
+import {
+  SequenceRangeModal,
+  DEFAULT_SEQUENCE_RANGE,
+  type SequenceRangeValue,
+} from "@/components/math-template/sequence-range-modal";
 import { MathPreviewEditModal } from "@/components/question-preview/math-preview-edit-modal";
 import type {
   GeneratedMathQuestion,
@@ -68,6 +74,8 @@ export default function AiGenerateMathPage() {
   const [cloneSeed, setCloneSeed] = useState<TemplateInput | null>(null);
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [seqRangeOpen, setSeqRangeOpen] = useState(false);
+  const [seqRange, setSeqRange] = useState<SequenceRangeValue>(DEFAULT_SEQUENCE_RANGE);
 
   // Data layer (bài học theo tuần + ngân hàng mẫu + CRUD mẫu) — xem use-math-gen.ts
   const {
@@ -88,7 +96,9 @@ export default function AiGenerateMathPage() {
   // mỗi lớp khác hẳn nhau. Lớp 5 là lớp cuối lộ trình 5 lớp (2026-08-13).
   const builtins = useMemo(() => {
     if (!lessonType) return [];
-    if (grade === 1) return getBuiltinsForLessonType(lessonType, 1);
+    if (grade === 1) {
+      return [...getBuiltinsForLessonType(lessonType, 1), ...getGrade1ShapeBuiltinsForLessonType(lessonType)];
+    }
     if (grade === 2) return getGrade2BuiltinsForLessonType(lessonType);
     if (grade === 3) return getGrade3BuiltinsForLessonType(lessonType);
     if (grade === 4) return getGrade4BuiltinsForLessonType(lessonType);
@@ -132,6 +142,7 @@ export default function AiGenerateMathPage() {
         week,
         count,
         lessonType,
+        builtinParams: selectedTemplate.id === "TPL_SEQ_01" ? seqRange : undefined,
       });
       setQuestions(qs);
       setReport(rpt);
@@ -198,6 +209,9 @@ export default function AiGenerateMathPage() {
     setEditing(userTemplates.find((s) => s.id === t.id) ?? null);
     setCloneSeed(null);
     setEditorOpen(true);
+  }
+  function openSequenceRange() {
+    setSeqRangeOpen(true);
   }
   function openCloneBuiltin(t: MathTemplate) {
     setEditing(null);
@@ -353,9 +367,13 @@ export default function AiGenerateMathPage() {
                                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
                             </>
+                          ) : t.formula !== "built-in" ? (
+                            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" title="Sửa (tạo bản sao)" onClick={() => openCloneBuiltin(t)}>
+                              <Pencil className="h-3.5 w-3.5" /> Sửa
+                            </Button>
                           ) : (
-                            t.formula !== "built-in" && (
-                              <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" title="Sửa (tạo bản sao)" onClick={() => openCloneBuiltin(t)}>
+                            t.id === "TPL_SEQ_01" && (
+                              <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" title="Sửa range (start/step)" onClick={openSequenceRange}>
                                 <Pencil className="h-3.5 w-3.5" /> Sửa
                               </Button>
                             )
@@ -509,6 +527,12 @@ export default function AiGenerateMathPage() {
         onOpenChange={setPreviewOpen}
         question={previewQuestion}
         onSave={saveAssetRefs}
+      />
+      <SequenceRangeModal
+        open={seqRangeOpen}
+        onOpenChange={setSeqRangeOpen}
+        initial={seqRange}
+        onApply={setSeqRange}
       />
     </div>
   );

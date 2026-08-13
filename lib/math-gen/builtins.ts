@@ -37,9 +37,15 @@ function declarative(
 }
 
 // ── sequence: generator imperative (port nguyên) ─────────────
-function genSequence(): RawGenerated {
-  const step = Math.floor(Math.random() * 5) + 1;
-  const start = Math.floor(Math.random() * 20);
+// params tuỳ chọn (admin chỉnh qua modal "Sửa" — xem sequence-range-modal.tsx): override
+// range start/step. Không truyền → giữ nguyên range gốc (start 0-19, step 1-5).
+function genSequence(_grade?: number, _difficulty?: number, params?: Record<string, number>): RawGenerated {
+  const stepMin = params?.stepMin ?? 1;
+  const stepMax = params?.stepMax ?? 5;
+  const startMin = params?.startMin ?? 0;
+  const startMax = params?.startMax ?? 19;
+  const step = Math.floor(Math.random() * (stepMax - stepMin + 1)) + stepMin;
+  const start = Math.floor(Math.random() * (startMax - startMin + 1)) + startMin;
   const seq = [start, start + step, start + step * 2, start + step * 3];
   const nextNum = start + step * 4;
   const options: number[] = [nextNum];

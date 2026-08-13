@@ -5,6 +5,7 @@
 // ============================================================
 import * as XLSX from "xlsx";
 import { BULK_COLUMNS, BULK_HEADER_LABELS } from "@/lib/bulk-import";
+import { skillLabel } from "./labels";
 import type { GeneratedMathQuestion } from "./types";
 
 const LETTERS = ["A", "B", "C", "D"];
@@ -94,7 +95,7 @@ export function toBulkRows(questions: GeneratedMathQuestion[], opts: ExportOpts)
       lessonCode,
       code,
       type: "multiple_choice",
-      skill: q.skill,
+      skill: skillLabel(q.skill),
       difficulty: Math.min(5, Math.max(1, q.difficulty || 1)),
       prompt: q.text,
       optionA: shuffled[0],
