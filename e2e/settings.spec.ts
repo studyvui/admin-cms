@@ -98,6 +98,44 @@ test("đổi mật khẩu gửi đúng payload và không bị đăng xuất", a
   await expect(page.getByRole("heading", { name: "Cài đặt" })).toBeVisible();
 });
 
+test("Huỷ dialog đổi mật khẩu sau khi lỗi → mở lại: form trống, không còn lỗi cũ", async ({
+  page,
+}) => {
+  // Giả lập backend trả lỗi 400 (vd sai mật khẩu hiện tại) để changePasswordMut.error có giá trị.
+  const api = setup().onPost(
+    /^\/auth\/change-password$/,
+    { statusCode: 400, message: "Mật khẩu hiện tại không đúng" },
+    400,
+  );
+  await api.install(page);
+  await page.goto("/settings");
+
+  const dialog = page.getByRole("dialog");
+
+  await page.getByRole("button", { name: "Đổi mật khẩu" }).click();
+  await dialog.getByLabel("Mật khẩu hiện tại").fill("wrong-old");
+  await dialog.getByLabel("Mật khẩu mới", { exact: true }).fill("new-secret1");
+  await dialog.getByLabel("Xác nhận mật khẩu mới").fill("new-secret1");
+  await dialog.getByRole("button", { name: "Đổi mật khẩu" }).click();
+
+  // Lỗi 400 hiện trong dialog (changePasswordMut.error được set).
+  await expect(dialog.getByText(/không đúng/)).toBeVisible();
+
+  // Đóng bằng Huỷ (KHÔNG phải do submit thành công) — dialog không unmount (Radix giữ instance),
+  // nên phải tự dọn form + mutation.error, nếu không sẽ rò rỉ sang lần mở tiếp theo.
+  await dialog.getByRole("button", { name: "Huỷ" }).click();
+  await expect(dialog).not.toBeVisible();
+
+  // Mở lại — field phải trống VÀ không còn hiện lỗi cũ dù chưa submit gì mới.
+  await page.getByRole("button", { name: "Đổi mật khẩu" }).click();
+  await expect(dialog.getByLabel("Mật khẩu hiện tại")).toHaveValue("");
+  await expect(
+    dialog.getByLabel("Mật khẩu mới", { exact: true }),
+  ).toHaveValue("");
+  await expect(dialog.getByLabel("Xác nhận mật khẩu mới")).toHaveValue("");
+  await expect(dialog.getByText(/không đúng/)).not.toBeVisible();
+});
+
 test("editor không có quyền truy cập", async ({ context, page }) => {
   const api = setup();
   await api.install(page);

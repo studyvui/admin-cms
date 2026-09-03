@@ -53,24 +53,28 @@ export function ChangePasswordDialog({
     defaultValues: { oldPassword: "", newPassword: "", confirmPassword: "" },
   });
 
+  // Dialog KHÔNG unmount giữa các lần mở/đóng (Radix giữ instance) — phải tự dọn form + lỗi mutation
+  // cũ mỗi lần đóng, dù đóng bằng Huỷ, submit thành công, hay Radix tự đóng (Esc/click ra ngoài).
+  // Nếu chỉ gọi onOpenChange(false) suông: field mật khẩu cũ còn nguyên khi mở lại, và lỗi đổi mật
+  // khẩu lần trước (changePasswordMut.error) hiện lại ngay dù người dùng chưa submit gì mới.
+  const handleClose = () => {
+    onOpenChange(false);
+    reset();
+    changePasswordMut.reset();
+  };
+
   const onSubmit = (values: PasswordFormValues) => {
     const payload = toChangePasswordPayload(values);
     changePasswordMut.mutate(payload, {
       onSuccess: (data) => {
         useAuthStore.getState().setTokens(data.accessToken, data.refreshToken);
-        onOpenChange(false);
+        handleClose();
       },
     });
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        onOpenChange(o);
-        if (!o) reset();
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Đổi mật khẩu</DialogTitle>
@@ -127,11 +131,7 @@ export function ChangePasswordDialog({
           )}
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={handleClose}>
               Huỷ
             </Button>
             <Button type="submit" disabled={changePasswordMut.isPending}>
