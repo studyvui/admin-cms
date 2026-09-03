@@ -15,6 +15,7 @@ interface AuthState {
     refreshToken: string;
   }) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
+  setUser: (user: User) => void;
   clear: () => void;
   hasRole: (...roles: User["role"][]) => boolean;
 }
@@ -29,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
         set({ user, accessToken, refreshToken }),
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken }),
+      setUser: (user) => set({ user }),
       clear: () => {
         // Dong bo: mat phien (logout / refresh token het han) phai xoa CA cookie
         // sv-admin-session, neu khong middleware van cho vao "/" nhung khong co

@@ -24,6 +24,39 @@ export interface LoginResponse extends AuthTokens {
   user: User;
 }
 
+// Cấu hình hệ thống (GĐ1 Settings) — admin xem/sửa qua GET/PATCH /admin/settings.
+export type SettingType = "boolean" | "number" | "string" | "json";
+export type SettingValue = boolean | number | string | Record<string, unknown>;
+
+export interface AppSetting {
+  id: string;
+  key: string;
+  value: SettingValue;
+  valueType: SettingType;
+  category: string;
+  label: string;
+  description?: string | null;
+  isPublic: boolean;
+  updatedBy?: { id: string; name: string; email: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Tài khoản cá nhân (GĐ1 Settings) — GET /users/me/profile. KHÔNG mở rộng User (chưa có căn cứ
+// backend trả thêm field nào khác trong GĐ1) — chỉ các field đã xác nhận trong brief.
+export interface MyProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  avatarUrl?: string | null;
+}
+
+export interface UpdateMeInput {
+  name?: string;
+  avatarUrl?: string;
+}
+
 export type Subject = "english" | "math";
 
 export type LessonStatus =
