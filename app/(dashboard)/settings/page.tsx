@@ -16,6 +16,7 @@ export default function SettingsPage() {
     settingsError,
     profile,
     isLoadingProfile,
+    profileError,
     updateSettingMut,
     updateMeMut,
     changePasswordMut,
@@ -49,6 +50,7 @@ export default function SettingsPage() {
           <AccountPanel
             profile={profile}
             isLoadingProfile={isLoadingProfile}
+            profileError={profileError}
             updateMeMut={updateMeMut}
             changePasswordMut={changePasswordMut}
             logoutAllMut={logoutAllMut}

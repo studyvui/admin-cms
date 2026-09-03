@@ -24,12 +24,14 @@ import { ChangePasswordDialog } from "./change-password-dialog";
 export function AccountPanel({
   profile,
   isLoadingProfile,
+  profileError,
   updateMeMut,
   changePasswordMut,
   logoutAllMut,
 }: {
   profile: MyProfile | undefined;
   isLoadingProfile: boolean;
+  profileError: unknown;
   updateMeMut: UseMutationResult<MyProfile, unknown, UpdateMeInput>;
   changePasswordMut: UseMutationResult<
     AuthTokens,
@@ -91,28 +93,35 @@ export function AccountPanel({
           {isLoadingProfile ? (
             <p className="text-sm text-muted-foreground">Đang tải...</p>
           ) : (
-            <form onSubmit={handleSubmit(onSubmit)} className="max-w-md space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" value={profile?.email ?? ""} disabled readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Tên hiển thị</Label>
-                <Input id="name" {...register("name")} />
-                {errors.name && (
-                  <p className="text-xs text-destructive">{errors.name.message}</p>
-                )}
-              </div>
-              {/* TODO: avatar upload UI — có thể bổ sung sau, API đã sẵn sàng (usersApi.uploadAvatar) */}
-              <div className="flex items-center gap-3">
-                <Button type="submit" disabled={updateMeMut.isPending}>
-                  {updateMeMut.isPending ? "Đang lưu..." : "Lưu thay đổi"}
-                </Button>
-                {saved && (
-                  <span className="text-sm text-emerald-600">Đã lưu</span>
-                )}
-              </div>
-            </form>
+            <div className="max-w-md space-y-4">
+              {!!profileError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {extractError(profileError)}
+                </div>
+              )}
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" value={profile?.email ?? ""} disabled readOnly />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Tên hiển thị</Label>
+                  <Input id="name" {...register("name")} />
+                  {errors.name && (
+                    <p className="text-xs text-destructive">{errors.name.message}</p>
+                  )}
+                </div>
+                {/* TODO: avatar upload UI — có thể bổ sung sau, API đã sẵn sàng (usersApi.uploadAvatar) */}
+                <div className="flex items-center gap-3">
+                  <Button type="submit" disabled={updateMeMut.isPending}>
+                    {updateMeMut.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+                  </Button>
+                  {saved && (
+                    <span className="text-sm text-emerald-600">Đã lưu</span>
+                  )}
+                </div>
+              </form>
+            </div>
           )}
         </CardContent>
       </Card>
