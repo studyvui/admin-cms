@@ -98,7 +98,7 @@ function _generateOne(
       meaning: getWordMeaning(vocabWord),
       distractors: [],
       assets: {
-        image: (spec.render_spec && spec.render_spec.image_path) || `assets/images/grade${grade}/english/${vocabWord.toLowerCase().replace(/\s+/g, "_")}_1.png`,
+        image: (spec.render_spec && spec.render_spec.image_path) || `assets/images/grade${grade}/english/${vocabWord.toLowerCase().replace(/\s+/g, "_")}_1.webp`,
         audio: (spec.render_spec && spec.render_spec.audio_path) || `assets/audio/grade${grade}/english/${vocabWord.toLowerCase().replace(/\s+/g, "_")}.mp3`,
       },
     },
