@@ -26,8 +26,13 @@ export function useUsers(filters: UserFilters) {
     queryFn: () => usersApi.list(filters),
   });
 
+  // Key CON của "admin-users" (không phải key "anh em" đứng riêng) — để invalidate({queryKey:
+  // ["admin-users"]}) tự động phủ luôn theo cơ chế prefix-match của TanStack Query. Trước đây
+  // dùng key rời ["admin-users-stats"] nên không bao giờ bị invalidate cùng, khiến 4 thẻ thống
+  // kê hiện số CŨ sau khi tạo/khoá/xoá/khôi phục user (staleTime 30s ở app/providers.tsx càng
+  // che giấu bug này lâu hơn).
   const statsQuery = useQuery({
-    queryKey: ["admin-users-stats"],
+    queryKey: ["admin-users", "stats"],
     queryFn: () => usersApi.stats(),
   });
 

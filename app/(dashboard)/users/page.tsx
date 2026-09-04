@@ -117,6 +117,10 @@ export default function UsersPage() {
     setDialogOpen(true);
   };
   const openEdit = (u: AdminUser) => {
+    // updateMut dùng CHUNG cho cả nút Khoá/Mở khoá ở bảng lẫn form Sửa — nếu 1 lần Khoá/Mở khoá
+    // trước đó fail (lỗi mạng/403), updateMut.error còn sót lại sẽ hiện NHẦM thành banner lỗi
+    // ngay khi mở dialog Sửa cho 1 user khác, dù chưa submit gì mới. Reset trước khi mở.
+    updateMut.reset();
     setEditingUser(u);
     setDialogOpen(true);
   };

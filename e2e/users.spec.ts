@@ -6,6 +6,7 @@ import {
   USER_STATS_FIXTURE,
   USER_ADMIN_SELF,
   USER_STUDENT,
+  USER_TEACHER_INACTIVE,
 } from "./fixtures/data";
 
 // Lưới test cho trang Quản lý người dùng (GĐ2): danh sách + 4 thẻ thống kê, tạo user (payload
@@ -134,6 +135,98 @@ test("khoá tài khoản (không phải chính mình) → confirm() rồi PATCH 
     new RegExp(`/admin/users/${USER_STUDENT.id}$`),
   )!.body;
   expect(body).toEqual({ isActive: false });
+});
+
+test("khoá tài khoản → 4 thẻ thống kê refetch số liệu mới ngay, không cần remount (fix wave)", async ({
+  page,
+}) => {
+  const patchPath = new RegExp(`/admin/users/${USER_STUDENT.id}$`);
+  // stats "động": trả số liệu MỚI ngay khi phát hiện đã có 1 PATCH khoá thành công — mô phỏng
+  // backend thật, để chứng minh statsQuery bị invalidate CÙNG usersQuery (key con của
+  // "admin-users") thay vì đứng riêng ["admin-users-stats"] như bug cũ.
+  const LOCKED_STATS = {
+    ...USER_STATS_FIXTURE,
+    active: USER_STATS_FIXTURE.active - 1,
+    inactive: USER_STATS_FIXTURE.inactive + 1,
+  };
+  const api = new ApiMock()
+    .onGet(/^\/admin\/users$/, USERS_LIST_FIXTURE)
+    .onGet(/^\/admin\/users\/stats$/, () =>
+      api.find("PATCH", patchPath) ? LOCKED_STATS : USER_STATS_FIXTURE,
+    );
+  await api.install(page);
+  page.on("dialog", (d) => d.accept());
+  await page.goto("/users");
+
+  const activeCard = page
+    .getByRole("heading", { name: "Đang hoạt động" })
+    .locator("..")
+    .locator("..");
+  const lockedCard = page
+    .getByRole("heading", { name: "Đã khoá" })
+    .locator("..")
+    .locator("..");
+
+  await expect(
+    activeCard.getByText(String(USER_STATS_FIXTURE.active), { exact: true }),
+  ).toBeVisible();
+  await expect(
+    lockedCard.getByText(String(USER_STATS_FIXTURE.inactive), { exact: true }),
+  ).toBeVisible();
+
+  const row = page.getByRole("row", { name: new RegExp(USER_STUDENT.email) });
+  await row.getByTitle("Khoá tài khoản").click();
+  await expect.poll(() => api.find("PATCH", patchPath)?.body).toBeTruthy();
+
+  await expect(
+    activeCard.getByText(String(LOCKED_STATS.active), { exact: true }),
+  ).toBeVisible();
+  await expect(
+    lockedCard.getByText(String(LOCKED_STATS.inactive), { exact: true }),
+  ).toBeVisible();
+});
+
+test("lỗi Khoá 1 dòng KHÔNG rò banner sang dialog Sửa của dòng khác (fix wave)", async ({
+  page,
+}) => {
+  const api = setup();
+  await api.install(page);
+
+  // updateMut dùng chung cho cả nút Khoá/Mở khoá ở bảng lẫn form Sửa — giả lập PATCH khoá
+  // USER_STUDENT fail 403 (route riêng, chạy TRƯỚC route rộng của ApiMock vì đăng ký sau).
+  await page.route(
+    `**/api/v1/admin/users/${USER_STUDENT.id}`,
+    async (route) => {
+      if (route.request().method() === "PATCH") {
+        return route.fulfill({
+          status: 403,
+          json: { statusCode: 403, message: "Không đủ quyền khoá tài khoản này" },
+        });
+      }
+      return route.fallback();
+    },
+  );
+
+  page.on("dialog", (d) => d.accept());
+  await page.goto("/users");
+
+  const studentRow = page.getByRole("row", {
+    name: new RegExp(USER_STUDENT.email),
+  });
+  await studentRow.getByTitle("Khoá tài khoản").click();
+  // Đợi mutation settle (thất bại) — nút hết pending trở lại bấm được.
+  await expect(studentRow.getByTitle("Khoá tài khoản")).toBeEnabled();
+
+  // Mở dialog Sửa cho MỘT DÒNG KHÁC — banner lỗi 403 cũ (updateMut.error) KHÔNG được rò sang.
+  const teacherRow = page.getByRole("row", {
+    name: new RegExp(USER_TEACHER_INACTIVE.email),
+  });
+  await teacherRow.getByTitle("Sửa người dùng").click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "Sửa người dùng" }),
+  ).toBeVisible();
+  await expect(dialog.getByText(/Không đủ quyền/)).not.toBeVisible();
 });
 
 test("tự bảo vệ: dòng của chính admin đang đăng nhập ẩn nút Khoá và Xoá", async ({
