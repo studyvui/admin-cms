@@ -206,3 +206,65 @@ export const PROFILE_FIXTURE = {
   role: "admin",
   avatarUrl: null,
 };
+
+// Người dùng (GĐ2 Quản lý người dùng) — id "u-admin" TRÙNG với USERS.admin trong
+// e2e/helpers/auth.ts (loginAs) để test được kịch bản "tự bảo vệ" (ẩn nút Khoá/Xoá dòng chính mình).
+export const USER_ADMIN_SELF = {
+  id: "u-admin",
+  email: "admin@studyvui.vn",
+  name: "Admin E2E",
+  role: "admin",
+  isActive: true,
+  avatarUrl: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  deletedAt: null,
+};
+
+export const USER_STUDENT = {
+  id: "u-student-0001",
+  email: "student1@studyvui.vn",
+  name: "Học sinh Một",
+  role: "student",
+  isActive: true,
+  avatarUrl: null,
+  createdAt: "2026-01-15T00:00:00Z",
+  updatedAt: "2026-01-15T00:00:00Z",
+  deletedAt: null,
+};
+
+export const USER_TEACHER_INACTIVE = {
+  id: "u-teacher-0002",
+  email: "teacher2@studyvui.vn",
+  name: "Giáo viên Hai",
+  role: "teacher",
+  isActive: false,
+  avatarUrl: null,
+  createdAt: "2026-02-01T00:00:00Z",
+  updatedAt: "2026-02-01T00:00:00Z",
+  deletedAt: null,
+};
+
+export const USERS_LIST_FIXTURE = {
+  items: [USER_ADMIN_SELF, USER_STUDENT, USER_TEACHER_INACTIVE],
+  total: 3,
+  page: 1,
+  limit: 20,
+};
+
+export const USER_STATS_FIXTURE = {
+  total: 3,
+  byRole: {
+    student: 1,
+    parent: 0,
+    teacher: 1,
+    editor: 0,
+    admin: 1,
+    qa: 0,
+    support: 0,
+  },
+  active: 2,
+  inactive: 1,
+  deleted: 0,
+  newLast30Days: 1,
+};
