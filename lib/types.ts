@@ -304,3 +304,51 @@ export interface DashboardOverview {
   activity: { answersToday: number };
   business: { activeSubscriptions: number };
 }
+
+// Báo cáo phân tích khách hàng (GĐ3) — đọc từ GET /admin/analytics/*. Field camelCase khớp thẳng
+// với response backend (AdminAnalyticsService trả object JS thường, không qua class-transformer).
+
+export interface AnalyticsOverview {
+  dau: number;
+  wau: number;
+  mau: number;
+  answersLast30Days: number;
+  accuracyLast30Days: number;
+}
+
+export interface ActiveLearnerPoint {
+  day: string;
+  learners: number;
+}
+
+export interface WeeklyMinutesPoint {
+  weekStart: string;
+  label: string;
+  learners: number;
+  avgMinutesPerLearner: number;
+}
+
+export interface HourHistogramPoint {
+  hour: number;
+  answers: number;
+}
+
+export interface SubjectSplitItem {
+  subject: Subject;
+  answers: number;
+  correct: number;
+  accuracy: number;
+  learners: number;
+}
+
+export interface ProblemLessonItem {
+  id: string;
+  code: string;
+  name: string;
+  subject: Subject;
+  grade: number;
+  attempts: number;
+  wrong: number;
+  learners: number;
+  wrongRate: number;
+}
