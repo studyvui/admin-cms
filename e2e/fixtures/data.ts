@@ -155,3 +155,54 @@ export const Q_DEPRECATED = q({
 });
 
 export const QUESTIONS = [Q_MC, Q_IMAGE, Q_AUDIO, Q_LETTER, Q_DEPRECATED];
+
+// Cấu hình hệ thống + hồ sơ cá nhân cho trang Cài đặt (Settings, GĐ1).
+export const SETTINGS_FIXTURE = [
+  {
+    id: "s-maintenance",
+    key: "system.maintenance_mode",
+    value: false,
+    valueType: "boolean",
+    category: "system",
+    label: "Chế độ bảo trì",
+    description: "Tạm khoá truy cập học sinh khi bật.",
+    isPublic: false,
+    updatedBy: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "s-max-upload",
+    key: "system.max_upload_mb",
+    value: 20,
+    valueType: "number",
+    category: "system",
+    label: "Giới hạn upload (MB)",
+    description: null,
+    isPublic: false,
+    updatedBy: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "s-support-email",
+    key: "general.support_email",
+    value: "support@studyvui.vn",
+    valueType: "string",
+    category: "general",
+    label: "Email hỗ trợ",
+    description: null,
+    isPublic: true,
+    updatedBy: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+];
+
+export const PROFILE_FIXTURE = {
+  id: "u-admin",
+  email: "admin@studyvui.vn",
+  name: "Admin E2E",
+  role: "admin",
+  avatarUrl: null,
+};

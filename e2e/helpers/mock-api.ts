@@ -21,9 +21,19 @@ type GetResponder = (url: URL) => unknown;
 export class ApiMock {
   readonly captured: CapturedRequest[] = [];
   private gets: { match: RegExp; res: unknown | GetResponder }[] = [];
+  private posts: { match: RegExp; res: unknown; status: number }[] = [];
 
   onGet(match: RegExp, res: unknown | GetResponder): this {
     this.gets.push({ match, res });
+    return this;
+  }
+
+  // Ghi đè response cố định cho 1 path POST (mặc định write echo lại body — không đủ cho case
+  // backend trả field KHÁC body gửi lên, vd POST /auth/change-password trả {accessToken,
+  // refreshToken} chứ không phải {oldPassword, newPassword}). `status` cho phép giả lập lỗi
+  // (vd 400/401) để assert UI xử lý mutation.error đúng.
+  onPost(match: RegExp, res: unknown, status = 200): this {
+    this.posts.push({ match, res, status });
     return this;
   }
 
@@ -62,6 +72,13 @@ export class ApiMock {
       const query: Record<string, string> = {};
       url.searchParams.forEach((v, k) => (query[k] = v));
       this.captured.push({ method, path, body, query });
+
+      if (method === "POST") {
+        const override = this.posts.find((p) => p.match.test(path));
+        if (override) {
+          return route.fulfill({ status: override.status, json: override.res });
+        }
+      }
 
       const base = body && typeof body === "object" ? (body as object) : {};
       return route.fulfill({ json: { id: "e2e-new-id", success: true, ...base } });
