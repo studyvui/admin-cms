@@ -16,6 +16,7 @@ import {
   FolderOpen,
   BarChart3,
   Users,
+  LineChart,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -62,6 +63,12 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/qa/queue", label: "QA Queue", icon: ShieldCheck, roles: ["admin", "qa"] },
       { href: "/qa/audit", label: "Audit Log", icon: History, roles: ["admin", "qa"] },
+    ],
+  },
+  {
+    title: "Phân tích",
+    items: [
+      { href: "/analytics", label: "Báo cáo phân tích", icon: LineChart, roles: ["admin"] },
     ],
   },
   {
