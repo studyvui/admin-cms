@@ -57,6 +57,51 @@ export interface UpdateMeInput {
   avatarUrl?: string;
 }
 
+// Quản lý người dùng (GĐ2) — admin xem/sửa user khác qua /admin/users/*. Khác MyProfile (GĐ1,
+// chỉ "tôi"): đây là hồ sơ ĐẦY ĐỦ 1 user bất kỳ, admin xem được.
+export type UserStatus = "active" | "inactive" | "deleted" | "all";
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  isActive: boolean;
+  avatarUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+export interface AdminUserDetail extends AdminUser {
+  studentProfile?: { grade: number } | null;
+  stats: { answers: number; lessonsCompleted: number; lastAnswerAt: string | null };
+}
+
+export interface UserStats {
+  total: number;
+  byRole: Record<UserRole, number>;
+  active: number;
+  inactive: number;
+  deleted: number;
+  newLast30Days: number;
+}
+
+export interface CreateUserInput {
+  email: string;
+  name: string;
+  password: string;
+  role: UserRole;
+  grade?: number;
+}
+
+export interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  isActive?: boolean;
+}
+
 export type Subject = "english" | "math";
 
 export type LessonStatus =
