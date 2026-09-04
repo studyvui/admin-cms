@@ -28,6 +28,8 @@ export const analyticsApi = {
     apiGet<SubjectSplitItem[]>("/admin/analytics/subject-split", {
       params: { days },
     }),
-  problemLessons: () =>
-    apiGet<ProblemLessonItem[]>("/admin/analytics/problem-lessons"),
+  problemLessons: (days: number) =>
+    apiGet<ProblemLessonItem[]>("/admin/analytics/problem-lessons", {
+      params: { days },
+    }),
 };

@@ -47,10 +47,10 @@ export function useSubjectSplit(days: number) {
   });
 }
 
-export function useProblemLessons() {
+export function useProblemLessons(days: number) {
   return useQuery({
-    queryKey: ["admin-analytics", "problem-lessons"],
-    queryFn: analyticsApi.problemLessons,
+    queryKey: ["admin-analytics", "problem-lessons", days],
+    queryFn: () => analyticsApi.problemLessons(days),
     staleTime: 30 * 60 * 1000, // 1800s
   });
 }

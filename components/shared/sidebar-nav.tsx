@@ -35,8 +35,8 @@ interface NavSection {
   items: NavItem[];
 }
 
-// 4 nhóm cho GĐ1 Settings: "Tổng quan" tách riêng ở đầu (Dashboard + số liệu cá nhân — khác
-// concern với quản lý nội dung), "Bảng tin"/"Phân tích" CHƯA thêm vì trang chưa tồn tại (GĐ sau).
+// 5 nhóm: "Tổng quan" tách riêng ở đầu (Dashboard + số liệu cá nhân — khác concern với quản lý
+// nội dung). "Phân tích" (GĐ3) đã có bên dưới. "Bảng tin" CHƯA thêm vì trang chưa tồn tại (GĐ sau).
 // href/icon/roles của từng mục giữ NGUYÊN VẸN so với danh sách phẳng cũ — chỉ gom nhóm hiển thị.
 const NAV_SECTIONS: NavSection[] = [
   {

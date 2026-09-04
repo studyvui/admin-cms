@@ -40,7 +40,7 @@ export default function AnalyticsPage() {
   const weeklyMinutesQuery = useWeeklyMinutes(WEEKLY_MINUTES_WEEKS);
   const hourHistogramQuery = useHourHistogram(days);
   const subjectSplitQuery = useSubjectSplit(days);
-  const problemLessonsQuery = useProblemLessons();
+  const problemLessonsQuery = useProblemLessons(days);
 
   if (!hydrated) return null;
   if (!hasRole("admin")) {
@@ -52,6 +52,9 @@ export default function AnalyticsPage() {
   }
 
   const overview = overviewQuery.data;
+  // Khi overview lỗi, 4 thẻ tóm tắt hiện "—" thay vì Skeleton mãi mãi (trông như đang tải vô thời
+  // hạn dù đã fail) — banner lỗi đỏ chi tiết vẫn hiện riêng bên dưới 4 thẻ.
+  const overviewFailed = Boolean(overviewQuery.error);
 
   return (
     <div className="space-y-6">
@@ -81,25 +84,25 @@ export default function AnalyticsPage() {
         <SummaryCard
           icon={UsersIcon}
           label="Hoạt động hôm nay (DAU)"
-          value={overview ? formatNumberVn(overview.dau) : undefined}
+          value={overview ? formatNumberVn(overview.dau) : overviewFailed ? "—" : undefined}
           color="text-blue-600"
         />
         <SummaryCard
           icon={TrendingUp}
           label="Hoạt động 7 ngày (WAU)"
-          value={overview ? formatNumberVn(overview.wau) : undefined}
+          value={overview ? formatNumberVn(overview.wau) : overviewFailed ? "—" : undefined}
           color="text-green-600"
         />
         <SummaryCard
           icon={UsersIcon}
           label="Hoạt động 30 ngày (MAU)"
-          value={overview ? formatNumberVn(overview.mau) : undefined}
+          value={overview ? formatNumberVn(overview.mau) : overviewFailed ? "—" : undefined}
           color="text-purple-600"
         />
         <SummaryCard
           icon={Percent}
           label="Độ chính xác (30 ngày)"
-          value={overview ? formatPercent(overview.accuracyLast30Days) : undefined}
+          value={overview ? formatPercent(overview.accuracyLast30Days) : overviewFailed ? "—" : undefined}
           color="text-amber-600"
         />
       </div>
@@ -187,5 +190,8 @@ function ChartSlot<T>({
       </div>
     );
   }
-  return <>{children(query.data as T)}</>;
+  // Guard phòng trường hợp sau này hook thêm `enabled:` khiến data vẫn undefined dù isLoading=false
+  // (vd query bị disable) — không crash trắng trang vì repo chưa có error boundary ở app/(dashboard)/.
+  if (query.data === undefined) return null;
+  return <>{children(query.data)}</>;
 }

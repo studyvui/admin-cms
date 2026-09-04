@@ -12,8 +12,14 @@ import {
 } from "./fixtures/data";
 
 // Lưới test cho trang Báo cáo phân tích (GĐ3): 4 thẻ DAU/WAU/MAU/độ chính xác, 4 chart (assert
-// trên bảng dữ liệu trong <details>, KHÔNG BAO GIỜ trên SVG), bảng bài học sai nhiều, đổi khoảng
-// thời gian refetch đúng endpoint phụ thuộc "days", và gate quyền chỉ-admin.
+// trên bảng dữ liệu trong <details>, KHÔNG assert nội dung/path bên trong SVG), bảng bài học sai
+// nhiều, đổi khoảng thời gian refetch đúng endpoint phụ thuộc "days", cô lập lỗi 1 endpoint không
+// làm trắng cả trang, và gate quyền chỉ-admin.
+//
+// Riêng biệt: có 1 nhóm assertion kiểm tra SVG của recharts thực sự render với chiều cao > 0 (chặn
+// lỗi <ResponsiveContainer> co về 0 chiều cao trong headless Chromium — chart trắng trơn, không báo
+// lỗi gì). Đây KHÔNG phải assert "nội dung/path bên trong SVG" (luật cấm ở trên nhắm vào việc assert
+// dữ liệu vẽ ra, dễ vỡ khi đổi thư viện/style) — chỉ kiểm tra container không co về 0.
 
 function setup() {
   return new ApiMock()
@@ -55,6 +61,48 @@ test("chart học viên hoạt động: bảng dữ liệu trong <details> khớ
   const card = page.getByText("Học viên hoạt động theo ngày").locator("../..");
   await card.getByText("Xem số liệu").click();
   await expect(card.getByRole("cell", { name: "22", exact: true })).toBeVisible();
+
+  // Chặn lỗi <ResponsiveContainer> co về 0 chiều cao trong headless Chromium (chart trắng trơn,
+  // không báo lỗi gì) — chỉ kiểm tra container không co về 0, KHÔNG assert dữ liệu/path bên trong.
+  // [role="application"]: SubjectSplitChart có <Legend/>, và mỗi mục legend cũng render 1
+  // "svg.recharts-surface" mini-icon riêng (14x14, KHÔNG có role="application") — nếu chỉ lọc
+  // theo class sẽ có lúc trúng nhầm icon đó thay vì SVG chính của chart. role="application" là
+  // thuộc tính Recharts chỉ gắn cho surface GỐC của chart (RootSurface), không gắn cho icon legend.
+  const svg = card.locator('svg.recharts-surface[role="application"]').first();
+  await expect
+    .poll(async () => (await svg.boundingBox())?.height ?? 0)
+    .toBeGreaterThan(200);
+});
+
+test("3 chart còn lại (weekly-minutes, hour-histogram, subject-split) render SVG chiều cao > 0", async ({
+  page,
+}) => {
+  const api = setup();
+  await api.install(page);
+  await page.goto("/analytics");
+
+  const weeklyMinutesCard = page
+    .getByText(/Phút làm bài \/ học viên \/ tuần/)
+    .locator("../..");
+  const hourHistogramCard = page
+    .getByText("Khung giờ hoạt động (giờ Việt Nam)")
+    .locator("../..");
+  const subjectSplitCard = page.getByText("Phân bố hoạt động theo môn").locator("../..");
+
+  for (const card of [weeklyMinutesCard, hourHistogramCard, subjectSplitCard]) {
+    // [role="application"]: SubjectSplitChart có <Legend/>, và mỗi mục legend cũng render 1
+  // "svg.recharts-surface" mini-icon riêng (14x14, KHÔNG có role="application") — nếu chỉ lọc
+  // theo class sẽ có lúc trúng nhầm icon đó thay vì SVG chính của chart. role="application" là
+  // thuộc tính Recharts chỉ gắn cho surface GỐC của chart (RootSurface), không gắn cho icon legend.
+  const svg = card.locator('svg.recharts-surface[role="application"]').first();
+    // expect.poll: ResponsiveContainer đo kích thước qua ResizeObserver sau 1 tick render — đọc
+    // boundingBox() ngay lập tức có thể bắt trúng trạng thái trung gian (chưa resize xong). Poll
+    // tới khi ổn định thay vì đọc 1 lần, tránh flaky do race condition (không liên quan tới bug
+    // co-về-0 mà assertion này nhắm tới).
+    await expect
+      .poll(async () => (await svg.boundingBox())?.height ?? 0)
+      .toBeGreaterThan(200);
+  }
 });
 
 test("bảng bài học sai nhiều nhất hiện đúng dữ liệu mock", async ({ page }) => {
@@ -100,6 +148,34 @@ test("đổi khoảng thời gian sang 7 ngày → active-learners hiện dữ l
   // đếm hàng — đây là hành vi thật của app khi refetch theo query key mới, không phải lỗi test.
   await card.getByText("Xem số liệu").click();
   await expect(card.getByRole("row")).toHaveCount(3); // header + 2 ngày (7 ngày qua)
+});
+
+test("1 endpoint lỗi (active-learners 500) không làm trắng cả trang — chart/bảng khác vẫn hiện đúng dữ liệu", async ({
+  page,
+}) => {
+  const api = new ApiMock()
+    .onGet(/^\/admin\/analytics\/overview$/, ANALYTICS_OVERVIEW_FIXTURE)
+    .onGet(/^\/admin\/analytics\/active-learners$/, { message: "Lỗi giả lập active-learners" }, 500)
+    .onGet(/^\/admin\/analytics\/weekly-minutes$/, ANALYTICS_WEEKLY_MINUTES_FIXTURE)
+    .onGet(/^\/admin\/analytics\/hour-histogram$/, ANALYTICS_HOUR_HISTOGRAM_FIXTURE)
+    .onGet(/^\/admin\/analytics\/subject-split$/, ANALYTICS_SUBJECT_SPLIT_FIXTURE)
+    .onGet(/^\/admin\/analytics\/problem-lessons$/, ANALYTICS_PROBLEM_LESSONS_FIXTURE);
+  await api.install(page);
+  await page.goto("/analytics");
+
+  // Chart lỗi (active-learners): ChartSlot hiện banner lỗi đỏ với message thật từ backend — không
+  // phải Skeleton mãi mãi, không crash trắng trang (heading tiêu đề "Học viên hoạt động theo ngày"
+  // của ActiveLearnersChart KHÔNG render vì ChartSlot chặn trước khi gọi children()).
+  await expect(page.getByText("Lỗi giả lập active-learners")).toBeVisible();
+  await expect(page.getByText("Học viên hoạt động theo ngày")).toHaveCount(0);
+
+  // Bằng chứng ChartSlot cô lập lỗi đúng, không lan ra toàn trang: chart weekly-minutes và bảng
+  // problem-lessons (2 endpoint KHÁC) vẫn hiện đúng dữ liệu fixture bình thường.
+  await expect(
+    page.getByText(/Phút làm bài \/ học viên \/ tuần/),
+  ).toBeVisible();
+  await expect(page.getByText("Bài 3: Colors")).toBeVisible();
+  await expect(page.getByText("60.0%")).toBeVisible();
 });
 
 test("editor không có quyền truy cập", async ({ context, page }) => {
