@@ -268,3 +268,53 @@ export const USER_STATS_FIXTURE = {
   deleted: 0,
   newLast30Days: 1,
 };
+
+// Báo cáo phân tích (GĐ3) — fixture cho e2e/analytics.spec.ts.
+
+export const ANALYTICS_OVERVIEW_FIXTURE = {
+  dau: 12,
+  wau: 45,
+  mau: 120,
+  answersLast30Days: 3200,
+  accuracyLast30Days: 0.782,
+};
+
+export const ANALYTICS_ACTIVE_LEARNERS_30D = [
+  { day: "2026-09-02", learners: 18 },
+  { day: "2026-09-03", learners: 22 },
+  { day: "2026-09-04", learners: 15 },
+];
+
+export const ANALYTICS_ACTIVE_LEARNERS_7D = [
+  { day: "2026-09-03", learners: 22 },
+  { day: "2026-09-04", learners: 15 },
+];
+
+export const ANALYTICS_WEEKLY_MINUTES_FIXTURE = [
+  { weekStart: "2026-08-24", label: "24/08 - 30/08", learners: 40, avgMinutesPerLearner: 22.5 },
+  { weekStart: "2026-08-31", label: "31/08 - 06/09", learners: 45, avgMinutesPerLearner: 25.1 },
+];
+
+export const ANALYTICS_HOUR_HISTOGRAM_FIXTURE = Array.from({ length: 24 }, (_, hour) => ({
+  hour,
+  answers: hour >= 18 && hour <= 21 ? 200 : 10,
+}));
+
+export const ANALYTICS_SUBJECT_SPLIT_FIXTURE = [
+  { subject: "english", answers: 2000, correct: 1600, accuracy: 0.8, learners: 90 },
+  { subject: "math", answers: 1200, correct: 900, accuracy: 0.75, learners: 60 },
+];
+
+export const ANALYTICS_PROBLEM_LESSONS_FIXTURE = [
+  {
+    id: "lesson-1",
+    code: "ENG-G1-W3",
+    name: "Bài 3: Colors",
+    subject: "english",
+    grade: 1,
+    attempts: 150,
+    wrong: 90,
+    learners: 40,
+    wrongRate: 0.6,
+  },
+];
