@@ -71,7 +71,16 @@ export default function AnalyticsPage() {
             Thống kê học viên, thời lượng học và nội dung cần chú ý
           </p>
         </div>
-        <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
+        <Select
+          value={String(days)}
+          onValueChange={(v) => {
+            setDays(Number(v));
+            // Đổi khoảng thời gian có thể làm ngày đang chọn rơi ra ngoài chart mới (vd đang mở
+            // chi tiết 1 ngày ở "30 ngày qua" rồi đổi sang "7 ngày qua") — đóng bảng chi tiết mồ
+            // côi đó thay vì để nó hiện tiếp dữ liệu của 1 ngày không còn cột nào tương ứng.
+            setSelectedDay(null);
+          }}
+        >
           <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
@@ -124,9 +133,7 @@ export default function AnalyticsPage() {
             data={data}
             selectedDay={selectedDay}
             onSelectDay={toggleSelectedDay}
-            detail={activeLearnersDetailQuery.data}
-            detailLoading={activeLearnersDetailQuery.isLoading}
-            detailError={activeLearnersDetailQuery.error}
+            detailQuery={activeLearnersDetailQuery}
           />
         )}
       </ChartSlot>

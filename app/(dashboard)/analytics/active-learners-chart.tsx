@@ -25,19 +25,22 @@ interface ActiveLearnersChartProps {
   data: ActiveLearnerPoint[];
   selectedDay: string | null;
   onSelectDay: (day: string) => void;
-  detail: ActiveLearnerDetailItem[] | undefined;
-  detailLoading: boolean;
-  detailError: unknown;
+  // Cùng hình dạng {data?, isLoading, error} với `query` của ChartSlot (page.tsx) — nhất quán cách
+  // truyền trạng thái 1 query cho component con thay vì tách rời 3 prop riêng lẻ.
+  detailQuery: {
+    data?: ActiveLearnerDetailItem[];
+    isLoading: boolean;
+    error: unknown;
+  };
 }
 
 export function ActiveLearnersChart({
   data,
   selectedDay,
   onSelectDay,
-  detail,
-  detailLoading,
-  detailError,
+  detailQuery,
 }: ActiveLearnersChartProps) {
+  const { data: detail, isLoading: detailLoading, error: detailError } = detailQuery;
   return (
     <Card>
       <CardHeader>

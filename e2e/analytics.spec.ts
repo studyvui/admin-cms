@@ -178,6 +178,30 @@ test("click vào cột biểu đồ ngày → mở chi tiết học viên hoạt
   await expect(card.getByText("Nguyễn Văn A")).toHaveCount(0);
 });
 
+test("đổi khoảng thời gian trong lúc đang mở chi tiết 1 ngày → tự đóng (tránh hiện dữ liệu ngày mồ côi)", async ({
+  page,
+}) => {
+  const api = setup().onGet(
+    /^\/admin\/analytics\/active-learners-detail$/,
+    (url: URL) =>
+      url.searchParams.get("day") === "2026-09-03" ? ANALYTICS_ACTIVE_LEARNERS_DETAIL_0903 : [],
+  );
+  await api.install(page);
+  await page.goto("/analytics");
+
+  const card = page.getByText("Học viên hoạt động theo ngày").locator("../..");
+  await card.locator(".recharts-bar-rectangle").nth(1).click();
+  await expect(card.getByText("Nguyễn Văn A")).toBeVisible();
+
+  // Đổi Select "30 ngày qua" → "7 ngày qua" — ngày 2026-09-03 vẫn còn trong ANALYTICS_ACTIVE_LEARNERS_7D
+  // nhưng đây là hành vi CHUNG (đóng bất kể ngày đã chọn có còn trong khoảng mới hay không) — kiểm tra
+  // bảng chi tiết biến mất ngay sau khi đổi filter, không phụ thuộc còn khớp hay không.
+  await page.getByRole("combobox").click();
+  await page.getByRole("option", { name: "7 ngày qua" }).click();
+
+  await expect(card.getByText("Nguyễn Văn A")).toHaveCount(0);
+});
+
 test("1 endpoint lỗi (active-learners 500) không làm trắng cả trang — chart/bảng khác vẫn hiện đúng dữ liệu", async ({
   page,
 }) => {
