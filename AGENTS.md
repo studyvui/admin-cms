@@ -14,7 +14,7 @@
 | Forms | react-hook-form + zod v4 |
 | HTTP | axios với JWT auto-refresh single-flight interceptor |
 | Excel | SheetJS (xlsx) — import 12 cột + export bộ sinh đề |
-| Charts | recharts (dashboard / my-stats) |
+| Charts | recharts (dashboard / my-stats / analytics — GĐ3) |
 | Test | vitest (parity eng-gen + unit math-gen) — `npm test`, hiện 335/335 |
 | Asset upload | Qua backend API (`lib/api/assets.ts` → R2). KHÔNG dùng aws-sdk trong admin-cms |
 | Tables | Plain HTML table (chưa dùng TanStack Table) |
@@ -43,7 +43,8 @@ app/
 │   ├── qa/audit/page.tsx       # Audit log diff viewer
 │   ├── my-stats/page.tsx       # Editor productivity report
 │   ├── ai-generate/page.tsx    # ✅ Sinh đề Tiếng Anh (lib/eng-gen) — ĐÃ HOẠT ĐỘNG
-│   └── ai-generate-math/page.tsx # ✅ Sinh đề Toán (lib/math-gen) — ĐÃ HOẠT ĐỘNG
+│   ├── ai-generate-math/page.tsx # ✅ Sinh đề Toán (lib/math-gen) — ĐÃ HOẠT ĐỘNG
+│   └── news/page.tsx           # CRUD bảng tin — GĐ4
 └── layout.tsx                  # Root layout
 components/
 ├── ui/                          # shadcn primitives (button, input, dialog, ...)
@@ -66,10 +67,6 @@ lib/
 middleware.ts                    # Cookie-based route protection
 hooks/use-auth.ts                # { user, hasRole, logout, hydrated }
 ```
-
-> **Lưu ý route:** sidebar (`components/shared/sidebar-nav.tsx`) có mục `/settings` (admin)
-> nhưng CHƯA có `app/(dashboard)/settings/page.tsx` → click sẽ rơi vào `app/not-found.tsx` (404).
-> Cần thêm page hoặc bỏ khỏi NAV. (`app/not-found.tsx` và `app/providers.tsx` đều đã tồn tại.)
 
 ## Cấu trúc chuẩn MỌI trang phức tạp (BẮT BUỘC — tối ưu cho Claude Code)
 
