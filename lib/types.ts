@@ -57,6 +57,51 @@ export interface UpdateMeInput {
   avatarUrl?: string;
 }
 
+// Quản lý người dùng (GĐ2) — admin xem/sửa user khác qua /admin/users/*. Khác MyProfile (GĐ1,
+// chỉ "tôi"): đây là hồ sơ ĐẦY ĐỦ 1 user bất kỳ, admin xem được.
+export type UserStatus = "active" | "inactive" | "deleted" | "all";
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  isActive: boolean;
+  avatarUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+export interface AdminUserDetail extends AdminUser {
+  studentProfile?: { grade: number } | null;
+  stats: { answers: number; lessonsCompleted: number; lastAnswerAt: string | null };
+}
+
+export interface UserStats {
+  total: number;
+  byRole: Record<UserRole, number>;
+  active: number;
+  inactive: number;
+  deleted: number;
+  newLast30Days: number;
+}
+
+export interface CreateUserInput {
+  email: string;
+  name: string;
+  password: string;
+  role: UserRole;
+  grade?: number;
+}
+
+export interface UpdateUserInput {
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  isActive?: boolean;
+}
+
 export type Subject = "english" | "math";
 
 export type LessonStatus =
@@ -258,4 +303,62 @@ export interface DashboardOverview {
   };
   activity: { answersToday: number };
   business: { activeSubscriptions: number };
+}
+
+// Báo cáo phân tích khách hàng (GĐ3) — đọc từ GET /admin/analytics/*. Field camelCase khớp thẳng
+// với response backend (AdminAnalyticsService trả object JS thường, không qua class-transformer).
+
+export interface AnalyticsOverview {
+  dau: number;
+  wau: number;
+  mau: number;
+  answersLast30Days: number;
+  accuracyLast30Days: number;
+}
+
+export interface ActiveLearnerPoint {
+  day: string;
+  learners: number;
+}
+
+export interface WeeklyMinutesPoint {
+  weekStart: string;
+  label: string;
+  learners: number;
+  avgMinutesPerLearner: number;
+}
+
+export interface HourHistogramPoint {
+  hour: number;
+  answers: number;
+}
+
+export interface SubjectSplitItem {
+  subject: Subject;
+  answers: number;
+  correct: number;
+  accuracy: number;
+  learners: number;
+}
+
+export interface ProblemLessonItem {
+  id: string;
+  code: string;
+  name: string;
+  subject: Subject;
+  grade: number;
+  attempts: number;
+  wrong: number;
+  learners: number;
+  wrongRate: number;
+}
+
+export interface ActiveLearnerDetailItem {
+  id: string;
+  name: string;
+  email: string;
+  answers: number;
+  correct: number;
+  accuracy: number;
+  mainSubject: Subject;
 }

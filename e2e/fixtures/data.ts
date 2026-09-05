@@ -206,3 +206,137 @@ export const PROFILE_FIXTURE = {
   role: "admin",
   avatarUrl: null,
 };
+
+// Người dùng (GĐ2 Quản lý người dùng) — id "u-admin" TRÙNG với USERS.admin trong
+// e2e/helpers/auth.ts (loginAs) để test được kịch bản "tự bảo vệ" (ẩn nút Khoá/Xoá dòng chính mình).
+export const USER_ADMIN_SELF = {
+  id: "u-admin",
+  email: "admin@studyvui.vn",
+  name: "Admin E2E",
+  role: "admin",
+  isActive: true,
+  avatarUrl: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  deletedAt: null,
+};
+
+export const USER_STUDENT = {
+  id: "u-student-0001",
+  email: "student1@studyvui.vn",
+  name: "Học sinh Một",
+  role: "student",
+  isActive: true,
+  avatarUrl: null,
+  createdAt: "2026-01-15T00:00:00Z",
+  updatedAt: "2026-01-15T00:00:00Z",
+  deletedAt: null,
+};
+
+export const USER_TEACHER_INACTIVE = {
+  id: "u-teacher-0002",
+  email: "teacher2@studyvui.vn",
+  name: "Giáo viên Hai",
+  role: "teacher",
+  isActive: false,
+  avatarUrl: null,
+  createdAt: "2026-02-01T00:00:00Z",
+  updatedAt: "2026-02-01T00:00:00Z",
+  deletedAt: null,
+};
+
+export const USERS_LIST_FIXTURE = {
+  items: [USER_ADMIN_SELF, USER_STUDENT, USER_TEACHER_INACTIVE],
+  total: 3,
+  page: 1,
+  limit: 20,
+};
+
+export const USER_STATS_FIXTURE = {
+  total: 3,
+  byRole: {
+    student: 1,
+    parent: 0,
+    teacher: 1,
+    editor: 0,
+    admin: 1,
+    qa: 0,
+    support: 0,
+  },
+  active: 2,
+  inactive: 1,
+  deleted: 0,
+  newLast30Days: 1,
+};
+
+// Báo cáo phân tích (GĐ3) — fixture cho e2e/analytics.spec.ts.
+
+export const ANALYTICS_OVERVIEW_FIXTURE = {
+  dau: 12,
+  wau: 45,
+  mau: 120,
+  answersLast30Days: 3200,
+  accuracyLast30Days: 0.782,
+};
+
+export const ANALYTICS_ACTIVE_LEARNERS_30D = [
+  { day: "2026-09-02", learners: 18 },
+  { day: "2026-09-03", learners: 22 },
+  { day: "2026-09-04", learners: 15 },
+];
+
+export const ANALYTICS_ACTIVE_LEARNERS_7D = [
+  { day: "2026-09-03", learners: 22 },
+  { day: "2026-09-04", learners: 15 },
+];
+
+export const ANALYTICS_WEEKLY_MINUTES_FIXTURE = [
+  { weekStart: "2026-08-24", label: "24/08 - 30/08", learners: 40, avgMinutesPerLearner: 22.5 },
+  { weekStart: "2026-08-31", label: "31/08 - 06/09", learners: 45, avgMinutesPerLearner: 25.1 },
+];
+
+export const ANALYTICS_HOUR_HISTOGRAM_FIXTURE = Array.from({ length: 24 }, (_, hour) => ({
+  hour,
+  answers: hour >= 18 && hour <= 21 ? 200 : 10,
+}));
+
+export const ANALYTICS_SUBJECT_SPLIT_FIXTURE = [
+  { subject: "english", answers: 2000, correct: 1600, accuracy: 0.8, learners: 90 },
+  { subject: "math", answers: 1200, correct: 900, accuracy: 0.75, learners: 60 },
+];
+
+export const ANALYTICS_PROBLEM_LESSONS_FIXTURE = [
+  {
+    id: "lesson-1",
+    code: "ENG-G1-W3",
+    name: "Bài 3: Colors",
+    subject: "english",
+    grade: 1,
+    attempts: 150,
+    wrong: 90,
+    learners: 40,
+    wrongRate: 0.6,
+  },
+];
+
+// Chi tiết học viên hoạt động ngày 2026-09-03 (drill-down từ chart active-learners).
+export const ANALYTICS_ACTIVE_LEARNERS_DETAIL_0903 = [
+  {
+    id: "u1",
+    name: "Nguyễn Văn A",
+    email: "a@studyvui.vn",
+    answers: 10,
+    correct: 8,
+    accuracy: 0.8,
+    mainSubject: "english",
+  },
+  {
+    id: "u2",
+    name: "Trần Thị B",
+    email: "b@studyvui.vn",
+    answers: 5,
+    correct: 3,
+    accuracy: 0.6,
+    mainSubject: "math",
+  },
+];

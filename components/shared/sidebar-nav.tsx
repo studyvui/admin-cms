@@ -15,6 +15,8 @@ import {
   Settings,
   FolderOpen,
   BarChart3,
+  Users,
+  LineChart,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,8 +35,8 @@ interface NavSection {
   items: NavItem[];
 }
 
-// 4 nhóm cho GĐ1 Settings: "Tổng quan" tách riêng ở đầu (Dashboard + số liệu cá nhân — khác
-// concern với quản lý nội dung), "Bảng tin"/"Phân tích" CHƯA thêm vì trang chưa tồn tại (GĐ sau).
+// 5 nhóm: "Tổng quan" tách riêng ở đầu (Dashboard + số liệu cá nhân — khác concern với quản lý
+// nội dung). "Phân tích" (GĐ3) đã có bên dưới. "Bảng tin" CHƯA thêm vì trang chưa tồn tại (GĐ sau).
 // href/icon/roles của từng mục giữ NGUYÊN VẸN so với danh sách phẳng cũ — chỉ gom nhóm hiển thị.
 const NAV_SECTIONS: NavSection[] = [
   {
@@ -64,8 +66,15 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "Phân tích",
+    items: [
+      { href: "/analytics", label: "Báo cáo phân tích", icon: LineChart, roles: ["admin"] },
+    ],
+  },
+  {
     title: "Quản trị",
     items: [
+      { href: "/users", label: "Người dùng", icon: Users, roles: ["admin"] },
       { href: "/settings", label: "Cài đặt", icon: Settings, roles: ["admin"] },
     ],
   },

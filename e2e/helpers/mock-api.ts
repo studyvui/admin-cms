@@ -20,11 +20,14 @@ type GetResponder = (url: URL) => unknown;
 
 export class ApiMock {
   readonly captured: CapturedRequest[] = [];
-  private gets: { match: RegExp; res: unknown | GetResponder }[] = [];
+  private gets: { match: RegExp; res: unknown | GetResponder; status: number }[] = [];
   private posts: { match: RegExp; res: unknown; status: number }[] = [];
 
-  onGet(match: RegExp, res: unknown | GetResponder): this {
-    this.gets.push({ match, res });
+  // `status` cho phép giả lập lỗi GET (vd 500) để assert 1 endpoint lỗi không làm trắng cả trang
+  // (ChartSlot cô lập lỗi theo từng query độc lập). Mặc định 200, backward-compatible với mọi
+  // cách gọi `onGet` cũ (2 tham số) trong repo.
+  onGet(match: RegExp, res: unknown | GetResponder, status = 200): this {
+    this.gets.push({ match, res, status });
     return this;
   }
 
@@ -50,7 +53,7 @@ export class ApiMock {
           if (g.match.test(path)) {
             const body =
               typeof g.res === "function" ? (g.res as GetResponder)(url) : g.res;
-            return route.fulfill({ json: body });
+            return route.fulfill({ status: g.status, json: body });
           }
         }
         return route.fulfill({ json: [] }); // mặc định rỗng, tránh treo UI
