@@ -39,6 +39,9 @@ test.describe("Bảng tin (admin)", () => {
       .fill("<p>Nội dung bài mới đủ dài để qua validate</p>");
     await dialog.getByRole("button", { name: "Tạo mới" }).click();
 
+    await expect
+      .poll(() => api.find("POST", /^\/admin\/news$/)?.body)
+      .toBeTruthy();
     const req = api.find("POST", /^\/admin\/news$/);
     expect(req?.body).toMatchObject({
       type: "update",
@@ -53,10 +56,9 @@ test.describe("Bảng tin (admin)", () => {
     const row = page.getByRole("row", { name: new RegExp(NEWS_DRAFT.title) });
     await row.getByTitle("Xuất bản").click();
 
-    const req = api.find(
-      "PATCH",
-      new RegExp(`^/admin/news/${NEWS_DRAFT.id}/status$`),
-    );
+    const statusPath = new RegExp(`^/admin/news/${NEWS_DRAFT.id}/status$`);
+    await expect.poll(() => api.find("PATCH", statusPath)?.body).toBeTruthy();
+    const req = api.find("PATCH", statusPath);
     expect(req?.body).toEqual({ status: "published" });
   });
 });
