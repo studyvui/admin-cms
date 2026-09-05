@@ -9,16 +9,35 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import type { ActiveLearnerPoint } from "@/lib/types";
+import type { ActiveLearnerPoint, ActiveLearnerDetailItem } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { formatNumberVn } from "@/lib/analytics/analytics-format";
+import { formatNumberVn, formatPercent } from "@/lib/analytics/analytics-format";
+import { SUBJECT_LABELS } from "@/lib/analytics/labels";
+import { extractError } from "@/lib/errors";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function formatDayLabel(iso: string) {
   const [, m, d] = iso.split("-");
   return `${d}/${m}`;
 }
 
-export function ActiveLearnersChart({ data }: { data: ActiveLearnerPoint[] }) {
+interface ActiveLearnersChartProps {
+  data: ActiveLearnerPoint[];
+  selectedDay: string | null;
+  onSelectDay: (day: string) => void;
+  detail: ActiveLearnerDetailItem[] | undefined;
+  detailLoading: boolean;
+  detailError: unknown;
+}
+
+export function ActiveLearnersChart({
+  data,
+  selectedDay,
+  onSelectDay,
+  detail,
+  detailLoading,
+  detailError,
+}: ActiveLearnersChartProps) {
   return (
     <Card>
       <CardHeader>
@@ -35,7 +54,16 @@ export function ActiveLearnersChart({ data }: { data: ActiveLearnerPoint[] }) {
                 labelFormatter={(label) => formatDayLabel(String(label))}
                 formatter={(v) => [v, "Học viên"]}
               />
-              <Bar dataKey="learners" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="learners"
+                fill="#2563eb"
+                radius={[4, 4, 0, 0]}
+                cursor="pointer"
+                onClick={(entry: { payload?: { day?: string } }) => {
+                  const day = entry?.payload?.day;
+                  if (day) onSelectDay(day);
+                }}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -60,6 +88,55 @@ export function ActiveLearnersChart({ data }: { data: ActiveLearnerPoint[] }) {
             </tbody>
           </table>
         </details>
+
+        {selectedDay && (
+          <div className="mt-4 rounded-md border p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-medium">
+                Học viên hoạt động ngày {formatDayLabel(selectedDay)}
+              </p>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:underline"
+                onClick={() => onSelectDay(selectedDay)}
+              >
+                Đóng
+              </button>
+            </div>
+            {detailLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : detailError ? (
+              <p className="text-sm text-destructive">{extractError(detailError)}</p>
+            ) : !detail || detail.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Không có học viên nào hoạt động trong ngày này.
+              </p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-1">Tên</th>
+                    <th className="py-1">Email</th>
+                    <th className="py-1 text-right">Số câu</th>
+                    <th className="py-1 text-right">Độ chính xác</th>
+                    <th className="py-1">Môn chủ yếu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.map((d) => (
+                    <tr key={d.id} className="border-t">
+                      <td className="py-1">{d.name}</td>
+                      <td className="py-1">{d.email}</td>
+                      <td className="py-1 text-right">{formatNumberVn(d.answers)}</td>
+                      <td className="py-1 text-right">{formatPercent(d.accuracy)}</td>
+                      <td className="py-1">{SUBJECT_LABELS[d.mainSubject] ?? d.mainSubject}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

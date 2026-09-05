@@ -9,6 +9,7 @@ import {
   ANALYTICS_HOUR_HISTOGRAM_FIXTURE,
   ANALYTICS_SUBJECT_SPLIT_FIXTURE,
   ANALYTICS_PROBLEM_LESSONS_FIXTURE,
+  ANALYTICS_ACTIVE_LEARNERS_DETAIL_0903,
 } from "./fixtures/data";
 
 // Lưới test cho trang Báo cáo phân tích (GĐ3): 4 thẻ DAU/WAU/MAU/độ chính xác, 4 chart (assert
@@ -148,6 +149,33 @@ test("đổi khoảng thời gian sang 7 ngày → active-learners hiện dữ l
   // đếm hàng — đây là hành vi thật của app khi refetch theo query key mới, không phải lỗi test.
   await card.getByText("Xem số liệu").click();
   await expect(card.getByRole("row")).toHaveCount(3); // header + 2 ngày (7 ngày qua)
+});
+
+test("click vào cột biểu đồ ngày → mở chi tiết học viên hoạt động ngày đó, click lại → đóng", async ({
+  page,
+}) => {
+  const api = setup().onGet(
+    /^\/admin\/analytics\/active-learners-detail$/,
+    (url: URL) =>
+      url.searchParams.get("day") === "2026-09-03" ? ANALYTICS_ACTIVE_LEARNERS_DETAIL_0903 : [],
+  );
+  await api.install(page);
+  await page.goto("/analytics");
+
+  const card = page.getByText("Học viên hoạt động theo ngày").locator("../..");
+  // Dữ liệu ANALYTICS_ACTIVE_LEARNERS_30D thứ tự [09-02, 09-03, 09-04] → cột index 1 = 09-03.
+  // Dùng selector cấu trúc SVG của recharts để trigger click (không assert nội dung vẽ ra) —
+  // theo đúng tiền lệ test SVG-height ở trên trong file này.
+  await card.locator(".recharts-bar-rectangle").nth(1).click();
+
+  await expect(card.getByText("Nguyễn Văn A")).toBeVisible();
+  await expect(card.getByText("a@studyvui.vn")).toBeVisible();
+  await expect(card.getByText("Tiếng Anh")).toBeVisible();
+  await expect(card.getByText("80.0%")).toBeVisible(); // độ chính xác u1: 8/10
+
+  // Click lại đúng cột đó → đóng bảng chi tiết (toggle).
+  await card.locator(".recharts-bar-rectangle").nth(1).click();
+  await expect(card.getByText("Nguyễn Văn A")).toHaveCount(0);
 });
 
 test("1 endpoint lỗi (active-learners 500) không làm trắng cả trang — chart/bảng khác vẫn hiện đúng dữ liệu", async ({

@@ -318,3 +318,25 @@ export const ANALYTICS_PROBLEM_LESSONS_FIXTURE = [
     wrongRate: 0.6,
   },
 ];
+
+// Chi tiết học viên hoạt động ngày 2026-09-03 (drill-down từ chart active-learners).
+export const ANALYTICS_ACTIVE_LEARNERS_DETAIL_0903 = [
+  {
+    id: "u1",
+    name: "Nguyễn Văn A",
+    email: "a@studyvui.vn",
+    answers: 10,
+    correct: 8,
+    accuracy: 0.8,
+    mainSubject: "english",
+  },
+  {
+    id: "u2",
+    name: "Trần Thị B",
+    email: "b@studyvui.vn",
+    answers: 5,
+    correct: 3,
+    accuracy: 0.6,
+    mainSubject: "math",
+  },
+];

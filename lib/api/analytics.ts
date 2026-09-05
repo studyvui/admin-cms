@@ -6,6 +6,7 @@ import type {
   HourHistogramPoint,
   SubjectSplitItem,
   ProblemLessonItem,
+  ActiveLearnerDetailItem,
 } from "@/lib/types";
 
 // API báo cáo phân tích khách hàng (GĐ3) — 6 endpoint đọc từ /admin/analytics/*, tất cả admin-only
@@ -31,5 +32,9 @@ export const analyticsApi = {
   problemLessons: (days: number) =>
     apiGet<ProblemLessonItem[]>("/admin/analytics/problem-lessons", {
       params: { days },
+    }),
+  activeLearnersDetail: (day: string) =>
+    apiGet<ActiveLearnerDetailItem[]>("/admin/analytics/active-learners-detail", {
+      params: { day },
     }),
 };

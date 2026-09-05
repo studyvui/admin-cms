@@ -13,6 +13,7 @@ import {
   useHourHistogram,
   useSubjectSplit,
   useProblemLessons,
+  useActiveLearnersDetail,
 } from "./use-analytics";
 import { ActiveLearnersChart } from "./active-learners-chart";
 import { WeeklyMinutesChart } from "./weekly-minutes-chart";
@@ -34,9 +35,14 @@ const WEEKLY_MINUTES_WEEKS = 8;
 export default function AnalyticsPage() {
   const { hasRole, hydrated } = useAuth();
   const [days, setDays] = useState(30);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const overviewQuery = useAnalyticsOverview();
   const activeLearnersQuery = useActiveLearners(days);
+  const activeLearnersDetailQuery = useActiveLearnersDetail(selectedDay);
+  // Click cùng 1 cột lần nữa -> đóng (toggle); click cột khác -> chuyển ngày đã chọn.
+  const toggleSelectedDay = (day: string) =>
+    setSelectedDay((prev) => (prev === day ? null : day));
   const weeklyMinutesQuery = useWeeklyMinutes(WEEKLY_MINUTES_WEEKS);
   const hourHistogramQuery = useHourHistogram(days);
   const subjectSplitQuery = useSubjectSplit(days);
@@ -113,7 +119,16 @@ export default function AnalyticsPage() {
       )}
 
       <ChartSlot query={activeLearnersQuery}>
-        {(data) => <ActiveLearnersChart data={data} />}
+        {(data) => (
+          <ActiveLearnersChart
+            data={data}
+            selectedDay={selectedDay}
+            onSelectDay={toggleSelectedDay}
+            detail={activeLearnersDetailQuery.data}
+            detailLoading={activeLearnersDetailQuery.isLoading}
+            detailError={activeLearnersDetailQuery.error}
+          />
+        )}
       </ChartSlot>
 
       <div className="grid gap-4 lg:grid-cols-2">

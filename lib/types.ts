@@ -352,3 +352,13 @@ export interface ProblemLessonItem {
   learners: number;
   wrongRate: number;
 }
+
+export interface ActiveLearnerDetailItem {
+  id: string;
+  name: string;
+  email: string;
+  answers: number;
+  correct: number;
+  accuracy: number;
+  mainSubject: Subject;
+}

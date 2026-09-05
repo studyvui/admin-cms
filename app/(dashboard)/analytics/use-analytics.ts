@@ -54,3 +54,14 @@ export function useProblemLessons(days: number) {
     staleTime: 30 * 60 * 1000, // 1800s
   });
 }
+
+// day = null nghĩa là chưa chọn ngày nào (chưa click cột biểu đồ) — enabled: false thì không gọi
+// API, tránh 1 request thừa mỗi lần vào trang trước khi người dùng click.
+export function useActiveLearnersDetail(day: string | null) {
+  return useQuery({
+    queryKey: ["admin-analytics", "active-learners-detail", day],
+    queryFn: () => analyticsApi.activeLearnersDetail(day as string),
+    enabled: day !== null,
+    staleTime: 15 * 60 * 1000, // 900s, khớp TTL backend
+  });
+}
