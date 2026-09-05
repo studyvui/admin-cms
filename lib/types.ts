@@ -362,3 +362,41 @@ export interface ActiveLearnerDetailItem {
   accuracy: number;
   mainSubject: Subject;
 }
+
+// Bảng tin (GĐ4) — admin xem/sửa qua /admin/news/*. Ảnh lưu FULL URL tuyệt đối
+// (giống VocabItem.imageUrl), không lưu key trần (khác Question.assetRefs).
+export type NewsType = "tip" | "update" | "event";
+export type NewsStatus = "draft" | "published";
+export type NewsSource = "manual" | "ai";
+
+export interface NewsPost {
+  id: string;
+  slug: string;
+  type: NewsType;
+  title: string;
+  hook?: string | null;
+  content: string;
+  image?: string | null;
+  status: NewsStatus;
+  source: NewsSource;
+  authorId?: string | null;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateNewsInput {
+  type: NewsType;
+  title: string;
+  hook?: string;
+  content: string;
+  image?: string;
+}
+
+export interface UpdateNewsInput {
+  type?: NewsType;
+  title?: string;
+  hook?: string;
+  content?: string;
+  image?: string;
+}
