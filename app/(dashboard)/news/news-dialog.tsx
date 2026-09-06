@@ -30,6 +30,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+// Stable empty array — passed to ImagePicker so its internal
+// useEffect([open, initialSelected]) doesn't loop on a fresh default `[]` (React #185)
+const EMPTY_KEYS: string[] = [];
+
 interface NewsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -243,6 +247,7 @@ export function NewsDialog({
       <ImagePicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
+        initialSelected={EMPTY_KEYS}
         prefix="news_images"
         onConfirm={handlePickerConfirm}
       />

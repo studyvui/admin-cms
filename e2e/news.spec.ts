@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 import { ApiMock } from "./helpers/mock-api";
-import { NEWS_LIST, NEWS_DRAFT } from "./fixtures/data";
+import { NEWS_LIST, NEWS_DRAFT, NEWS_PUBLISHED } from "./fixtures/data";
 
 async function setup(page: import("@playwright/test").Page) {
   const api = new ApiMock().onGet(/^\/admin\/news$/, NEWS_LIST);
@@ -47,6 +47,38 @@ test.describe("Bảng tin (admin)", () => {
       type: "update",
       title: "Bài mới từ E2E",
       content: "<p>Nội dung bài mới đủ dài để qua validate</p>",
+    });
+  });
+
+  test("mở Sửa bài viết → điền sẵn dữ liệu → cập nhật gửi đúng payload (đủ 5 key)", async ({ page }) => {
+    const api = await setup(page);
+    await page.goto("/news");
+    const row = page.getByRole("row", { name: new RegExp(NEWS_PUBLISHED.title) });
+    await row.getByTitle("Sửa bài viết").click();
+
+    await expect(
+      page.getByRole("heading", { name: "Sửa bài viết" }),
+    ).toBeVisible();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.locator("#title")).toHaveValue(NEWS_PUBLISHED.title);
+    await expect(dialog.locator("#content")).toHaveValue(NEWS_PUBLISHED.content);
+
+    await dialog.locator("#title").fill("Bài đã đăng E2E (đã sửa)");
+    await dialog.getByRole("button", { name: "Cập nhật" }).click();
+
+    const patchPath = new RegExp(`^/admin/news/${NEWS_PUBLISHED.id}$`);
+    await expect.poll(() => api.find("PATCH", patchPath)?.body).toBeTruthy();
+    const req = api.find("PATCH", patchPath);
+    expect(Object.keys(req?.body as object).sort()).toEqual(
+      ["content", "hook", "image", "title", "type"].sort(),
+    );
+    expect(req?.body).toEqual({
+      type: NEWS_PUBLISHED.type,
+      title: "Bài đã đăng E2E (đã sửa)",
+      hook: NEWS_PUBLISHED.hook,
+      content: NEWS_PUBLISHED.content,
+      image: NEWS_PUBLISHED.image,
     });
   });
 

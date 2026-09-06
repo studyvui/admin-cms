@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Plus, Send, Trash2, Undo2 } from "lucide-react";
 import { useNews } from "./use-news";
 import { NewsDialog } from "./news-dialog";
@@ -45,11 +45,21 @@ const ALL_TYPE = "__all__";
 
 export default function NewsPage() {
   const { hasRole, hydrated } = useAuth();
+  const [qInput, setQInput] = useState("");
   const [filters, setFilters] = useState<{
     status?: NewsStatus;
     type?: NewsType;
     q?: string;
   }>({});
+
+  // Debounce ô tìm kiếm 300ms — tránh gọi API mỗi phím gõ.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((f) => ({ ...f, q: qInput.trim() || undefined }));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [qInput]);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<NewsPost | null>(null);
 
@@ -160,10 +170,8 @@ export default function NewsPage() {
               <Label className="mb-1.5 block text-xs">Tìm tiêu đề</Label>
               <Input
                 placeholder="Nhập từ khoá..."
-                value={filters.q ?? ""}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, q: e.target.value || undefined }))
-                }
+                value={qInput}
+                onChange={(e) => setQInput(e.target.value)}
               />
             </div>
           </div>
