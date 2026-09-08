@@ -83,6 +83,11 @@ test.describe("Bảng tin (admin)", () => {
       .poll(() => api.find("POST", /^\/admin\/assets\/upload$/))
       .toBeTruthy();
 
+    // Anh Bang tin PHAI vao dung folder news_images/ trong R2, khong lan
+    // sang uploads/ mac dinh hay folder cua trang khac (bai hoc, cau hoi...).
+    const uploadReq = api.find("POST", /^\/admin\/assets\/upload$/);
+    expect(uploadReq?.query.prefix).toBe("news_images");
+
     // Anh vua upload duoc tu dong chon, hien trong khu "Da chon"
     await expect(dialog.getByText("anh-test.png")).toBeVisible();
   });
