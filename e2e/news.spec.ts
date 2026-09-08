@@ -50,6 +50,43 @@ test.describe("Bảng tin (admin)", () => {
     });
   });
 
+  test("bấm Tải ảnh lên trong Chọn ảnh → upload + tự chọn ảnh mới", async ({ page }) => {
+    const api = await setup(page);
+    api.onGet(/^\/admin\/assets$/, []).onPost(
+      /^\/admin\/assets\/upload$/,
+      {
+        key: "news_images/anh-test.png",
+        url: "https://cdn.studyvui.vn/news_images/anh-test.png",
+        size: 68,
+        lastModified: new Date().toISOString(),
+        type: "image",
+      },
+    );
+    await page.goto("/news");
+    await page.getByRole("button", { name: "Thêm bài viết" }).click();
+    await page.getByRole("button", { name: "Chọn ảnh" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Chọn ảnh" });
+    await expect(dialog).toBeVisible();
+
+    const fileInput = dialog.locator('input[type="file"]');
+    await fileInput.setInputFiles({
+      name: "Ảnh Test.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+    });
+
+    await expect
+      .poll(() => api.find("POST", /^\/admin\/assets\/upload$/))
+      .toBeTruthy();
+
+    // Anh vua upload duoc tu dong chon, hien trong khu "Da chon"
+    await expect(dialog.getByText("anh-test.png")).toBeVisible();
+  });
+
   test("mở Sửa bài viết → điền sẵn dữ liệu → cập nhật gửi đúng payload (đủ 5 key)", async ({ page }) => {
     const api = await setup(page);
     await page.goto("/news");
