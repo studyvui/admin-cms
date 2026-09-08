@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Search, Check, X } from "lucide-react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search, Check, Upload, X } from "lucide-react";
 import { assetsApi } from "@/lib/api/assets";
+import { sanitizeAssetFilename } from "@/lib/assets/asset-filename";
 import { extractError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -39,13 +40,18 @@ export function ImagePicker({
 }: ImagePickerProps) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>(initialSelected);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const queryKey = ["assets", "image", prefix];
 
   useEffect(() => {
     if (open) setSelected(initialSelected);
   }, [open, initialSelected]);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["assets", "image", prefix],
+    queryKey,
     queryFn: () => assetsApi.list({ type: "image", prefix }),
     enabled: open,
     staleTime: 60_000,
@@ -67,6 +73,33 @@ export function ImagePicker({
       }
       return prev.includes(key) ? [] : [key];
     });
+  };
+
+  const handleFilesChosen = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const uploaded: string[] = [];
+      for (const file of Array.from(files)) {
+        const safeName = sanitizeAssetFilename(file.name);
+        const safeFile =
+          safeName === file.name
+            ? file
+            : new File([file], safeName, { type: file.type });
+        const asset = await assetsApi.upload(safeFile, prefix);
+        uploaded.push(asset.key);
+      }
+      await queryClient.invalidateQueries({ queryKey });
+      setSelected((prev) =>
+        multiple ? [...prev, ...uploaded] : uploaded.slice(-1),
+      );
+    } catch (err) {
+      setUploadError(extractError(err));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -93,7 +126,31 @@ export function ImagePicker({
           <Badge variant="outline">
             {filtered.length} / {data?.length ?? 0}
           </Badge>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple={multiple}
+            className="hidden"
+            onChange={(e) => handleFilesChosen(e.target.files)}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            {uploading ? "Đang tải lên..." : "Tải ảnh lên"}
+          </Button>
         </div>
+
+        {uploadError && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {uploadError}
+          </p>
+        )}
 
         <div className="max-h-[55vh] min-h-[300px] overflow-y-auto rounded-md border">
           {isLoading ? (

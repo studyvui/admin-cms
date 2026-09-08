@@ -340,3 +340,35 @@ export const ANALYTICS_ACTIVE_LEARNERS_DETAIL_0903 = [
     mainSubject: "math",
   },
 ];
+
+export const NEWS_DRAFT = {
+  id: "33333333-3333-4333-8333-333333333333",
+  slug: "bai-nhap-e2e",
+  type: "tip",
+  title: "Bài nháp E2E",
+  hook: null,
+  content: "<p>Nội dung nháp</p>",
+  image: null,
+  status: "draft",
+  source: "manual",
+  publishedAt: null,
+  createdAt: "2026-09-01T00:00:00Z",
+  updatedAt: "2026-09-01T00:00:00Z",
+};
+
+export const NEWS_PUBLISHED = {
+  id: "44444444-4444-4444-8444-444444444444",
+  slug: "bai-da-dang-e2e",
+  type: "update",
+  title: "Bài đã đăng E2E",
+  hook: "<i>Hook</i>",
+  content: "<p>Nội dung đã đăng</p>",
+  image: "https://cdn.studyvui.vn/news_images/e2e.jpg",
+  status: "published",
+  source: "manual",
+  publishedAt: "2026-09-02T00:00:00Z",
+  createdAt: "2026-09-02T00:00:00Z",
+  updatedAt: "2026-09-02T00:00:00Z",
+};
+
+export const NEWS_LIST = [NEWS_PUBLISHED, NEWS_DRAFT];

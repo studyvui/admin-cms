@@ -17,6 +17,7 @@ import {
   BarChart3,
   Users,
   LineChart,
+  Newspaper,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,8 +36,8 @@ interface NavSection {
   items: NavItem[];
 }
 
-// 5 nhóm: "Tổng quan" tách riêng ở đầu (Dashboard + số liệu cá nhân — khác concern với quản lý
-// nội dung). "Phân tích" (GĐ3) đã có bên dưới. "Bảng tin" CHƯA thêm vì trang chưa tồn tại (GĐ sau).
+// 6 nhóm: "Tổng quan" tách riêng ở đầu (Dashboard + số liệu cá nhân — khác concern với quản lý
+// nội dung). "Phân tích" (GĐ3) và "Bảng tin" (GĐ4) đã có bên dưới.
 // href/icon/roles của từng mục giữ NGUYÊN VẸN so với danh sách phẳng cũ — chỉ gom nhóm hiển thị.
 const NAV_SECTIONS: NavSection[] = [
   {
@@ -63,6 +64,12 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/qa/queue", label: "QA Queue", icon: ShieldCheck, roles: ["admin", "qa"] },
       { href: "/qa/audit", label: "Audit Log", icon: History, roles: ["admin", "qa"] },
+    ],
+  },
+  {
+    title: "Bảng tin",
+    items: [
+      { href: "/news", label: "Bảng tin", icon: Newspaper, roles: ["admin", "editor"] },
     ],
   },
   {
