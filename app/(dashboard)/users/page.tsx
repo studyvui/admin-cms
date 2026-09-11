@@ -17,6 +17,7 @@ import {
 import { useUsers, type UserFilters } from "./use-users";
 import { UserDialog } from "./user-dialog";
 import { ResetPasswordDialog } from "./reset-password-dialog";
+import { ResetProgressDialog } from "./reset-progress-dialog";
 import {
   USER_ROLE_LABELS,
   USER_STATUS_LABELS,
@@ -84,6 +85,9 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
+  // [PLAN.md muc 23 #8] Muc tieu cua dialog "Reset tien do hoc tap" (khac resetTarget o tren
+  // — do la dialog doi mat khau).
+  const [resetTienDoTarget, setResetTienDoTarget] = useState<AdminUser | null>(null);
 
   const {
     users,
@@ -93,6 +97,7 @@ export default function UsersPage() {
     createMut,
     updateMut,
     resetPasswordMut,
+    resetProgressMut,
     deleteMut,
     restoreMut,
   } = useUsers(filters);
@@ -332,6 +337,17 @@ export default function UsersPage() {
                           >
                             <KeyRound className="h-4 w-4" />
                           </Button>
+                          {/* [PLAN.md muc 23 #8] Chi hoc sinh moi co tien do hoc tap de reset. */}
+                          {u.role === "student" && status !== "deleted" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Reset tiến độ học tập"
+                              onClick={() => setResetTienDoTarget(u)}
+                            >
+                              <RotateCcw className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                           {!isSelf && status !== "deleted" && (
                             <Button
                               variant="ghost"
@@ -423,6 +439,17 @@ export default function UsersPage() {
         }
         createMut={createMut}
         updateMut={updateMut}
+      />
+
+      <ResetProgressDialog
+        open={!!resetTienDoTarget}
+        onOpenChange={(o) => {
+          if (!o) setResetTienDoTarget(null);
+        }}
+        targetUserId={resetTienDoTarget?.id ?? null}
+        targetUserEmail={resetTienDoTarget?.email ?? null}
+        targetUserName={resetTienDoTarget?.name ?? null}
+        resetProgressMut={resetProgressMut}
       />
 
       <ResetPasswordDialog

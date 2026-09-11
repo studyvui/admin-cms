@@ -63,6 +63,13 @@ export function useUsers(filters: UserFilters) {
     onSuccess: invalidate,
   });
 
+  // [PLAN.md muc 23 #8] Xoa tien do -> bang/stats co the doi (vd cot "hoat dong gan nhat")
+  // nen invalidate nhu delete/restore.
+  const resetProgressMut = useMutation({
+    mutationFn: (id: string) => usersApi.resetProgress(id),
+    onSuccess: invalidate,
+  });
+
   return {
     users: usersQuery.data,
     isLoading: usersQuery.isLoading,
@@ -73,5 +80,6 @@ export function useUsers(filters: UserFilters) {
     resetPasswordMut,
     deleteMut,
     restoreMut,
+    resetProgressMut,
   };
 }

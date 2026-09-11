@@ -51,4 +51,13 @@ export const usersApi = {
   delete: (id: string) =>
     apiDelete<{ id: string; deleted: boolean }>(`/admin/users/${id}`),
   restore: (id: string) => apiPost<AdminUser>(`/admin/users/${id}/restore`),
+  // [PLAN.md muc 23 #8] Xoa tien do hoc tap (sao/lich su/SRS/boss). GIU xu, cap, huy hieu,
+  // vat pham, va giu nguyen tai khoan. POST chu khong DELETE: day la HANH DONG tren tai
+  // nguyen User, khong phai xoa tai nguyen do.
+  resetProgress: (id: string) =>
+    apiPost<{
+      id: string;
+      deleted: { progress: number; answerLog: number; reviewQueueItem: number; userBossProgress: number };
+      progressResetAt: string;
+    }>(`/admin/users/${id}/reset-progress`),
 };
