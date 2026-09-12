@@ -9,6 +9,7 @@ import {
   Unlock,
   Trash2,
   RotateCcw,
+  Star,
   Users as UsersIcon,
   UserCheck,
   UserX,
@@ -18,6 +19,7 @@ import { useUsers, type UserFilters } from "./use-users";
 import { UserDialog } from "./user-dialog";
 import { ResetPasswordDialog } from "./reset-password-dialog";
 import { ResetProgressDialog } from "./reset-progress-dialog";
+import { GrantVipDialog } from "./grant-vip-dialog";
 import {
   USER_ROLE_LABELS,
   USER_STATUS_LABELS,
@@ -88,6 +90,8 @@ export default function UsersPage() {
   // [PLAN.md muc 23 #8] Muc tieu cua dialog "Reset tien do hoc tap" (khac resetTarget o tren
   // — do la dialog doi mat khau).
   const [resetTienDoTarget, setResetTienDoTarget] = useState<AdminUser | null>(null);
+  // [PLAN.md muc 25] Muc tieu cua dialog "Kich hoat VIP".
+  const [grantVipTarget, setGrantVipTarget] = useState<AdminUser | null>(null);
 
   const {
     users,
@@ -98,6 +102,7 @@ export default function UsersPage() {
     updateMut,
     resetPasswordMut,
     resetProgressMut,
+    grantVipMut,
     deleteMut,
     restoreMut,
   } = useUsers(filters);
@@ -348,6 +353,17 @@ export default function UsersPage() {
                               <RotateCcw className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
+                          {/* [PLAN.md muc 25] Kich hoat VIP thu cong — chi hoc sinh moi mua VIP. */}
+                          {u.role === "student" && status !== "deleted" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Kích hoạt VIP"
+                              onClick={() => setGrantVipTarget(u)}
+                            >
+                              <Star className="h-4 w-4 text-amber-500" />
+                            </Button>
+                          )}
                           {!isSelf && status !== "deleted" && (
                             <Button
                               variant="ghost"
@@ -450,6 +466,16 @@ export default function UsersPage() {
         targetUserEmail={resetTienDoTarget?.email ?? null}
         targetUserName={resetTienDoTarget?.name ?? null}
         resetProgressMut={resetProgressMut}
+      />
+
+      <GrantVipDialog
+        open={!!grantVipTarget}
+        onOpenChange={(o) => {
+          if (!o) setGrantVipTarget(null);
+        }}
+        targetUserId={grantVipTarget?.id ?? null}
+        targetUserName={grantVipTarget?.name ?? null}
+        grantVipMut={grantVipMut}
       />
 
       <ResetPasswordDialog
