@@ -70,6 +70,12 @@ export function useUsers(filters: UserFilters) {
     onSuccess: invalidate,
   });
 
+  // [PLAN.md muc 25] Kich hoat/gia han VIP thu cong -> khong doi bang/stats hien co
+  // (VIP khong phai 1 cot hien thi trong bang users hom nay) nen KHONG can invalidate.
+  const grantVipMut = useMutation({
+    mutationFn: ({ id, days }: { id: string; days: number }) => usersApi.grantVip(id, days),
+  });
+
   return {
     users: usersQuery.data,
     isLoading: usersQuery.isLoading,
@@ -81,5 +87,6 @@ export function useUsers(filters: UserFilters) {
     deleteMut,
     restoreMut,
     resetProgressMut,
+    grantVipMut,
   };
 }
