@@ -1,10 +1,11 @@
 // Chot ranh gioi SheetJS.
 //
 // Vi sao can file nay: goi `xlsx` KHONG cai tu npm nua. SheetJS roi npm tu 2023,
-// ban con duoc va chi phat hanh qua CDN rieng cua ho, nen package.json ghim thang
-// vao mot URL tarball (xem muc 24 trong README/PLAN.md cua repo frontend).
+// ban con duoc va chi phat hanh qua CDN rieng cua ho, nen tarball duoc tai ve va
+// commit thang vao `vendor/`, package.json tro toi bang `file:` (xem muc "Nang
+// xlsx" trong AGENTS.md, va muc 24 trong README/PLAN.md cua repo frontend).
 // Duong cai dat phi chuan do co the hong theo kieu ma npm audit khong thay:
-// tarball doi noi dung, CDN tra ve ban khac, hoac ban moi doi API.
+// tarball bi thay, hoac ban moi doi API.
 //
 // Toan bo test cu cua bulk-import chi goi ham THUAN (rowSchema/toCreateInput/
 // toBulkRows) — khong co test nao cham XLSX.read/XLSX.write that. File nay lap

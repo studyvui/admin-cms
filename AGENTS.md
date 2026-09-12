@@ -112,25 +112,38 @@ components/            # field/modal DÙNG CHUNG nhiều trang (vd form-fields/a
 
 ## Nâng xlsx (SheetJS) — PHẢI LÀM TAY
 
-`package.json` ghim `xlsx` thẳng vào tarball CDN, không phải dải version npm:
+`package.json` trỏ `xlsx` vào **tarball nằm ngay trong repo**, không phải dải version npm:
 
 ```
-"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+"xlsx": "file:vendor/xlsx-0.20.3.tgz"
 ```
 
 **Lý do:** SheetJS rời npm từ 2023. Bản npm cao nhất là 0.18.5 và dính 2 lỗ hổng
 (GHSA-4r6h-8v6p-xvw6 prototype pollution, GHSA-5pgg-2g8v-p4x9 ReDoS) mà **vĩnh viễn
-không có bản vá trên npm**. Bản sạch chỉ phát hành qua CDN riêng của họ.
+không có bản vá trên npm**. Bản sạch chỉ phát hành qua CDN riêng của họ, nên ta tải
+về một lần rồi commit thẳng vào `vendor/`.
+
+**Tại sao vendor chứ không trỏ thẳng URL CDN:** trỏ URL thì mọi lần `npm ci` trên
+Vercel đều phải tải được `cdn.sheetjs.com`. CDN sập đúng lúc cache miss là **kẹt
+toàn bộ deploy**, kể cả hotfix không liên quan gì tới Excel. Vendor thì build
+không chạm mạng ngoài nữa — đã kiểm chứng bằng `npm ci --offline` trên một bản
+chép sạch: 537 gói, thành công, 0 lỗ hổng.
+
+**Cách nâng lên bản mới:**
+
+```bash
+curl -o vendor/xlsx-<ver>.tgz https://cdn.sheetjs.com/xlsx-<ver>/xlsx-<ver>.tgz
+npm install --save file:vendor/xlsx-<ver>.tgz
+git rm vendor/xlsx-<ban-cu>.tgz      # dọn bản cũ, tarball ~2.4MB
+```
 
 **Hệ quả phải nhớ:**
 
-1. **Dependabot không tự nâng được** dependency dạng URL. Muốn lên bản mới phải sửa tay:
-   `npm install --save https://cdn.sheetjs.com/xlsx-<ver>/xlsx-<ver>.tgz`
-2. **`npm audit` thì VẪN bắt được** — nó đối chiếu theo tên + version trong cây phụ thuộc,
-   không quan tâm tải từ đâu. Nên advisory mới của xlsx vẫn hiện ra.
-3. **Build phụ thuộc mạng:** `npm ci` trên Vercel phải tải được `cdn.sheetjs.com`.
-   CDN sập đúng lúc cache miss là **kẹt toàn bộ deploy**, kể cả hotfix không liên quan.
-   `package-lock.json` có ghi hash `integrity` cho tarball này nên vẫn chống được giả mạo.
+1. **Dependabot không tự nâng được** dependency dạng `file:` — phải làm tay theo trên.
+2. **`npm audit` thì VẪN bắt được** — nó đối chiếu theo tên + version trong cây phụ
+   thuộc, không quan tâm tải từ đâu. Advisory mới của xlsx vẫn hiện ra.
+3. **`package-lock.json` vẫn giữ hash `integrity`** của tarball, nên `npm ci` vẫn
+   phát hiện được nếu file bị sửa.
 4. **Test chốt ranh giới:** `lib/__tests__/bulk-import-xlsx.test.ts`. Đừng xóa.
    Nó đọc cả file do chính SheetJS ghi lẫn file dùng **bảng chuỗi dùng chung**
    (`sharedStrings.xml`) — kiểu mà Excel và Google Sheets ghi ra, tức kiểu file thật
