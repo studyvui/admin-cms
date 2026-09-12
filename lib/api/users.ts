@@ -60,4 +60,8 @@ export const usersApi = {
       deleted: { progress: number; answerLog: number; reviewQueueItem: number; userBossProgress: number };
       progressResetAt: string;
     }>(`/admin/users/${id}/reset-progress`),
+  // [PLAN.md muc 25] Kich hoat/gia han VIP thu cong (khong qua VNPay/MoMo — chua co
+  // merchant that). Admin nhap so ngay tuy y.
+  grantVip: (id: string, days: number) =>
+    apiPost<{ id: string; endsAt: string }>(`/admin/users/${id}/grant-vip`, { days }),
 };
