@@ -57,6 +57,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { trangThaiVip } from "@/lib/users/vip-status";
+
 const ALL_ROLES = "__all__";
 const PAGE_LIMIT = 20;
 
@@ -300,6 +302,7 @@ export default function UsersPage() {
                   <TableHead>Vai trò</TableHead>
                   <TableHead>Trạng thái</TableHead>
                   <TableHead>Ngày tạo</TableHead>
+                  <TableHead>VIP đến ngày</TableHead>
                   <TableHead className="w-40 text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
@@ -307,6 +310,7 @@ export default function UsersPage() {
                 {items.map((u) => {
                   const status = userStatusOf(u);
                   const isSelf = !!currentUser && currentUser.id === u.id;
+                  const vip = trangThaiVip(u.vipUntil, new Date());
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">{u.email}</TableCell>
@@ -323,6 +327,27 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {formatDate(u.createdAt)}
+                      </TableCell>
+                      {/* [PLAN.md muc 25 #3] Goi DA HET HAN van hien (mo + nhan "hết hạn")
+                          thay vi an di — de admin biet ai can moi gia han. */}
+                      <TableCell className="text-xs">
+                        {!vip.conHan && vip.soNgayConLai === null && vip.nhan === "—" ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : vip.conHan ? (
+                          <span>
+                            {vip.nhan}{" "}
+                            <span className="text-muted-foreground">
+                              (còn {vip.soNgayConLai} ngày)
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {vip.nhan}{" "}
+                            <Badge variant="outline" className="ml-1 text-[10px]">
+                              hết hạn
+                            </Badge>
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">

@@ -71,6 +71,10 @@ export interface AdminUser {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+  // [PLAN.md muc 25 #3] Han goi VIP (endsAt cua Subscription active xa nhat) — backend co
+  // the CHUA trien khai (ban cu) nen de optional. Goi da het han VAN duoc tra ve; phan
+  // biet con han / het han xem lib/users/vip-status.ts.
+  vipUntil?: string | null;
 }
 
 export interface AdminUserDetail extends AdminUser {
