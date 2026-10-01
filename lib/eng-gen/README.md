@@ -31,8 +31,10 @@
 
 - `missing_letter`: che **1 chữ nếu từ ≤ 2 ký tự, ngược lại che 2 chữ liền nhau** tại vị trí ngẫu nhiên;
   `correct_answer` là chuỗi các chữ bị che. Số thẻ nhiễu = `max(2, 4 - hideCount)` → tổng luôn 4 thẻ.
-- Ảnh ghép theo **quy ước tên file**: `pickRandomImage` khớp asset bắt đầu bằng `{word}_` hoặc `{word}.`,
-  fallback về `imageUrl` của từ vựng. Không đủ 3 nhiễu có ảnh → bỏ câu, cộng `report.qa_failed`.
+- Ảnh (ảnh đề, ảnh đáp án, ảnh nhiễu) lấy qua `vocabImageKey`: **`imageUrl` của từ vựng trong bài trước**; chỉ khi từ
+  chưa có ảnh mới bốc `pickRandomImage` (khớp asset bắt đầu bằng `{word}_` hoặc `{word}.`) — kho R2 giữ mọi phiên bản
+  ảnh, kể cả bản lỗi đã được thay, nên không bốc ngẫu nhiên khi đã có ảnh gán sẵn. Không đủ 3 nhiễu có ảnh → bỏ câu,
+  cộng `report.qa_failed`.
 - Dùng `Math.random` (KHÔNG seeded) → test assert số lượng/cấu trúc, không assert nội dung.
 
 > Quy ước vận hành (`README/CLAUDE.md`): mỗi bài từ vựng thường = 12 câu, chia đều **4-4-4** cho ba dạng.

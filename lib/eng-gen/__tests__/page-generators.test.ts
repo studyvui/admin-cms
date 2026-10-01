@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import type { Lesson } from "@/lib/types";
+import type { AssetItem, Lesson } from "@/lib/types";
 import {
   cdnToAssetKey,
   labelFromPath,
+  generateAudioChoiceFromVocab,
   generateLetterFromVocab,
   generateImageChoiceFromVocab,
   type VocabGenOpts,
@@ -82,6 +83,68 @@ describe("generateImageChoiceFromVocab", () => {
     questions.forEach((q) => {
       expect(q.blueprintType).toBe("image_choice");
       expect((q.components.distractors as string[]).length).toBe(3);
+    });
+  });
+});
+
+// Kho asset R2 giu MOI phien ban anh cua 1 tu (anh loi cu `_1` khong bao gio bi xoa — ND-05). Anh dung cho
+// cau hoi phai la anh da gan cho tu trong bai (imageUrl, da soat, khop the hoc tu), KHONG boc ngau nhien
+// (STUDYVUI README/PLAN.md muc 50 dot 3: boc ngau nhien tung lay ca anh in chu lo dap an).
+describe("Ảnh câu hỏi lấy từ imageUrl của từ vựng", () => {
+  const CDN = "https://cdn.studyvui.vn/";
+  const WORDS = ["duck", "cat", "dog", "pig"];
+  const kho: AssetItem[] = WORDS.flatMap((w) =>
+    [1, 2, 3].map((n) => ({
+      key: `images/grade2/english/${w}_${n}.webp`,
+      url: `${CDN}images/grade2/english/${w}_${n}.webp`,
+      size: 1,
+      lastModified: "",
+      type: "image" as const,
+    })),
+  );
+  const bai = lesson(
+    WORDS.map((w) => ({
+      word: w,
+      meaning: `nghĩa ${w}`,
+      imageUrl: `${CDN}images/grade2/english/${w}_2.webp`,
+      audioUrl: `${CDN}audio/grade2/english/${w}.mp3`,
+    })),
+  );
+  const anhDung = new Set(WORDS.map((w) => `images/grade2/english/${w}_2.webp`));
+
+  it("image_choice: ảnh đề = imageUrl của từ", () => {
+    const { questions } = generateImageChoiceFromVocab(kho, opts(bai, 12));
+    questions.forEach((q) => {
+      const assets = q.components.assets as { image: string };
+      expect(assets.image).toBe(`images/grade2/english/${q.components.vocab}_2.webp`);
+    });
+  });
+
+  it("missing_letter: ảnh = imageUrl của từ", () => {
+    const { questions } = generateLetterFromVocab(kho, opts(bai, 12));
+    questions.forEach((q) => {
+      const assets = q.components.assets as { image: string };
+      expect(assets.image).toBe(`images/grade2/english/${q.components.vocab}_2.webp`);
+    });
+  });
+
+  it("audio_choice: ảnh đáp án đúng VÀ ảnh nhiễu đều = imageUrl của từ", () => {
+    const { questions } = generateAudioChoiceFromVocab(kho, opts(bai, 12));
+    expect(questions).toHaveLength(12);
+    questions.forEach((q) => {
+      const imgs = (q.variable_values as { optionImages: string[] }).optionImages;
+      expect(imgs).toHaveLength(4);
+      imgs.forEach((k) => expect(anhDung.has(k)).toBe(true));
+      expect(imgs[0]).toBe(`images/grade2/english/${q.components.vocab}_2.webp`);
+    });
+  });
+
+  it("từ CHƯA có imageUrl → vẫn bốc trong kho asset theo tên từ", () => {
+    const chuaCoAnh = lesson(WORDS.map((w) => ({ word: w, meaning: `nghĩa ${w}` })));
+    const { questions } = generateLetterFromVocab(kho, opts(chuaCoAnh, 4));
+    questions.forEach((q) => {
+      const assets = q.components.assets as { image: string };
+      expect(assets.image).toMatch(new RegExp(`/${q.components.vocab}_[123]\\.webp$`));
     });
   });
 });

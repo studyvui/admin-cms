@@ -2,7 +2,7 @@
 // — tách THUẦN từ ai-generate/page.tsx để test được. Nhận `opts` thay vì đọc state component.
 // Dùng Math.random (không seeded) → test assert số lượng/cấu trúc, không assert nội dung.
 
-import type { AssetItem, Lesson } from "@/lib/types";
+import type { AssetItem, Lesson, VocabItem } from "@/lib/types";
 import type { GeneratedQuestion, GenReport, Skill } from "@/lib/eng-gen/types";
 
 export interface VocabGenOpts {
@@ -44,6 +44,12 @@ export function pickRandomImage(word: string, imageAssets: AssetItem[]): string 
   return matches[Math.floor(Math.random() * matches.length)].key;
 }
 
+// Ảnh của 1 từ vựng: ƯU TIÊN ảnh đã gán cho từ trong bài (imageUrl — ảnh đã soát, khớp thẻ học từ). Kho R2 giữ mọi
+// phiên bản ảnh (ảnh lỗi cũ không bị xoá) nên chỉ bốc ngẫu nhiên khi từ chưa có ảnh.
+export function vocabImageKey(v: VocabItem, imageAssets: AssetItem[]): string {
+  return cdnToAssetKey(v.imageUrl ?? "") || pickRandomImage(v.word, imageAssets);
+}
+
 export function generateAudioChoiceFromVocab(
   imageAssets: AssetItem[],
   opts: VocabGenOpts,
@@ -62,7 +68,7 @@ export function generateAudioChoiceFromVocab(
     const vi = withAudio[i % withAudio.length];
     const word = vi.word;
 
-    const correctImageKey = pickRandomImage(word, imageAssets) || cdnToAssetKey(vi.imageUrl ?? "");
+    const correctImageKey = vocabImageKey(vi, imageAssets);
     if (!correctImageKey) { report.qa_failed++; continue; }
 
     const distractorPool = allVocab.filter((v) => v.word !== word);
@@ -70,7 +76,7 @@ export function generateAudioChoiceFromVocab(
     const distractorImagePaths: string[] = [];
     for (const dv of shuffled) {
       if (distractorImagePaths.length >= 3) break;
-      const img = pickRandomImage(dv.word, imageAssets);
+      const img = vocabImageKey(dv, imageAssets);
       if (img) distractorImagePaths.push(img);
     }
 
@@ -138,7 +144,7 @@ export function generateImageChoiceFromVocab(
 
     if (distractorMeanings.length < 3) { report.qa_failed++; continue; }
 
-    const imageKey = pickRandomImage(word, imageAssets) || cdnToAssetKey(vi.imageUrl ?? "");
+    const imageKey = vocabImageKey(vi, imageAssets);
     const audioKey = vi.audioUrl ? cdnToAssetKey(vi.audioUrl) : "";
 
     const seq = startSeq + i;
@@ -210,7 +216,7 @@ export function generateLetterFromVocab(
     const needed = Math.max(2, 4 - hideCount);
     distractorLetters.push(...pool.slice(0, needed));
 
-    const imageKey = pickRandomImage(vi.word, imageAssets) || cdnToAssetKey(vi.imageUrl ?? "");
+    const imageKey = vocabImageKey(vi, imageAssets);
     const audioKey = vi.audioUrl ? cdnToAssetKey(vi.audioUrl) : "";
 
     const seq = startSeq + i;
