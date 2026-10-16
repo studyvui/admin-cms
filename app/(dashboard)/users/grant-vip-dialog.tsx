@@ -51,8 +51,13 @@ export function GrantVipDialog({
 
   async function chay() {
     if (!targetUserId || !hopLe) return;
-    const ra = await grantVipMut.mutateAsync({ id: targetUserId, days: soNgay });
-    setKetQua(ra);
+    try {
+      const ra = await grantVipMut.mutateAsync({ id: targetUserId, days: soNgay });
+      setKetQua(ra);
+    } catch {
+      // Lỗi đã hiện trong dialog qua grantVipMut.isError / extractError (không alert); bắt ở đây để
+      // không còn promise bị từ chối mà không ai xử lý.
+    }
   }
 
   return (

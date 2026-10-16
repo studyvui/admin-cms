@@ -121,3 +121,37 @@ test("backend trả lỗi khi kích hoạt VIP → hiện thông báo lỗi tron
     dialog.getByText("Không thể kích hoạt VIP: tài khoản đã bị khoá"),
   ).toBeVisible();
 });
+
+// [PLAN.md muc 40 #6] Loi cap VIP da hien trong dialog, nhung `chay()` goi mutateAsync khong try/catch nen con 1 promise
+// bi tu choi KHONG ai bat (unhandledrejection) — cung kieu reset-progress-dialog.tsx truoc day.
+test("kích hoạt VIP lỗi → hiện thông báo VÀ không có promise bị từ chối chưa bắt", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as unknown as { __chuaBat: number }).__chuaBat = 0;
+    window.addEventListener("unhandledrejection", () => {
+      (window as unknown as { __chuaBat: number }).__chuaBat++;
+    });
+  });
+  const grantVipPath = new RegExp(`/admin/users/${USER_STUDENT.id}/grant-vip$`);
+  const api = setup().onPost(
+    grantVipPath,
+    { statusCode: 500, message: "Lỗi máy chủ khi kích hoạt VIP" },
+    500,
+  );
+  await api.install(page);
+  await page.goto("/users");
+
+  const row = page.getByRole("row", { name: new RegExp(USER_STUDENT.email) });
+  await row.getByTitle("Kích hoạt VIP").click();
+
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/Số ngày/).fill("30");
+  await dialog.getByRole("button", { name: "Kích hoạt VIP" }).click();
+
+  await expect(dialog.getByText("Lỗi máy chủ khi kích hoạt VIP")).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(
+    await page.evaluate(() => (window as unknown as { __chuaBat: number }).__chuaBat),
+  ).toBe(0);
+});
