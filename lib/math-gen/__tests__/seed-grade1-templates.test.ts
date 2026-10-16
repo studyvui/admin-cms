@@ -40,19 +40,14 @@ describe("seed-grade1-templates: 65 template Lớp 1 (GD14 Phase 2)", () => {
     });
   });
 
+  // [PLAN.md muc 41] Bài này quét mọi template có condition x 60 lần x tối đa 200 lần thử mỗi lần: chạy riêng ~2 giây nhưng
+  // cả bộ (23 file song song) vượt timeout mặc định 5000ms (đo 5128ms) -> đỏ chập chờn. Timeout rộng hơn, không đổi phép kiểm.
   it("condition (nếu có) phải thoả được trong đa số lần thử (không phải reject-sampling vô ích)", () => {
     const withCond = GRADE1_TEMPLATES.filter((t) => t.condition);
     expect(withCond.length).toBeGreaterThan(0);
     for (const tpl of withCond) {
-      let satisfied = 0;
       const runs = 60;
-      for (let i = 0; i < runs; i++) {
-        const vars = resolveVarsWithCondition(tpl.vars, tpl.condition, 1);
-        // resolveVarsWithCondition với maxAttempts=1: nếu lần đầu đã thoả thì true;
-        // ta test riêng bằng cách gọi lại với maxAttempts cao và so sánh tỉ lệ thoả ở lần đầu.
-        void vars;
-      }
-      // Test thực dụng hơn: gọi với maxAttempts=200 (giống production) phải LUÔN ra vars hợp lệ
+      // Gọi với maxAttempts=200 (giống production) phải LUÔN ra vars hợp lệ
       // (không bị "hết attempts vẫn trả vars cuối không thoả điều kiện" quá thường xuyên).
       let anyFail = 0;
       for (let i = 0; i < runs; i++) {
@@ -62,8 +57,6 @@ describe("seed-grade1-templates: 65 template Lớp 1 (GD14 Phase 2)", () => {
         if (r.answer === "?" || /\{[a-zA-Z_]+\}/.test(text)) anyFail++;
       }
       expect(anyFail).toBe(0);
-      satisfied = runs - anyFail;
-      expect(satisfied).toBe(runs);
     }
-  });
+  }, 30_000);
 });
