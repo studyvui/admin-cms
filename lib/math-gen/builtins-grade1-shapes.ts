@@ -6,7 +6,7 @@
 // builtins.ts) — sai bản chất sư phạm. File này viết mẫu RIÊNG theo đúng nội
 // dung SGK thật (PLAN/TOÁN/ghi_chu_dang_bai_sgk/lop1_tap1_ghichu.md Bài
 // 3/6/7/8/9/14/15/16), theo khuôn T()+generator imperative đã dùng ở
-// builtins-grade2.ts (vd demDoanThang/nhanDienKhoi cho classify_2d/classify_3d).
+// builtins-grade2-gen-a.ts / builtins-grade2-gen-b.ts (vd demDoanThang/nhanDienKhoi cho classify_2d/classify_3d).
 //
 // Tất cả các dạng này đều "KHẢ THI CẦN ẢNH" theo ghi chú SGK: câu hỏi + đáp án
 // sinh tự động bằng text/số, ảnh minh hoạ do admin gắn tay ở modal Xem trước
@@ -19,7 +19,7 @@
 // ============================================================
 import type { MathTemplate, RawGenerated } from "./types";
 
-// ---------- Helpers thuần (copy quy ước từ builtins-grade2.ts) ----------
+// ---------- Helpers thuần (copy quy ước từ builtins-grade2-gen-a.ts) ----------
 function shuffleArr<T>(a: T[]): T[] {
   const arr = a.slice();
   for (let i = arr.length - 1; i > 0; i--) {
@@ -149,7 +149,7 @@ function genMatchObjectShape(): Gen {
 // classify_2d / classify_3d (T7/T18 và T14/T16 — nhận diện hình phẳng/khối)
 // Pool cố định nhỏ (4 giá trị) → luôn xuất đủ 4 đáp án. Tên học sinh biến thiên
 // trong text để giảm trùng chữ ký (signature) khi sinh batch nhiều câu, cùng
-// tinh thần cảnh báo ở demDoanThang (builtins-grade2.ts): "tránh 1 template chỉ
+// tinh thần cảnh báo ở demDoanThang (builtins-grade2-gen-a.ts):"tránh 1 template chỉ
 // ra đúng 1 câu khiến batch sinh hàng loạt bị trùng lặp và bị loại".
 // ================================================================
 const KID_NAMES = ["Lan", "Mai", "Tuấn", "Nam", "Hà", "Minh", "An", "Bình"];
