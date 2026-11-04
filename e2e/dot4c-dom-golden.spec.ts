@@ -469,6 +469,11 @@ test("ai-generate-math: mẫu tự tạo (Sửa / Xoá), Thêm mẫu, bản sao 
   const api = await openMath(page);
   const got: Record<string, string> = {};
   const dialog = page.getByRole("dialog");
+  // Bấm Sửa khi CHƯA chọn mẫu: nút nằm trong vùng chặn nổi bọt nên không được chọn mẫu đó.
+  await page.getByTitle("Sửa", { exact: true }).first().click();
+  await expect(dialog).toBeVisible();
+  await closeDialog(page);
+  got["math:edit-click-keeps-no-selection"] = await snap("math_edit_keeps", page.locator("main"));
   await page.getByText("✏️ Custom").first().click();
   got["math:custom-selected"] = await snap("math_custom_sel", page.locator("main"));
   await page.getByTitle("Sửa", { exact: true }).first().click();
@@ -499,5 +504,24 @@ test("ai-generate-math: mẫu tự tạo (Sửa / Xoá), Thêm mẫu, bản sao 
   await expect(dialog).toBeVisible();
   got["math:dialog-sequence-range"] = await snap("math_dlg_seq", dialog);
   await closeDialog(page);
+  check(got);
+});
+
+test("ai-generate-math: đổi tuần kẹp trong 1..35 và bỏ chọn mẫu đang chọn", async ({ page }) => {
+  await openMath(page);
+  const got: Record<string, string> = {};
+  const week = page.locator('input[type="number"]').first();
+  await page.getByText("⚙️ Built-in").first().click();
+  await week.fill("2");
+  await expect(page.getByText("G1_W02_MATH", { exact: true })).toBeVisible();
+  await week.fill("1");
+  await expect(page.getByText("G1_W01_MATH", { exact: true })).toBeVisible();
+  got["math:week-change-resets-selection"] = await snap("math_week_reset", page.locator("main"));
+  await week.fill("99");
+  await expect(week).toHaveValue("35");
+  got["math:week-clamp-high"] = await snap("math_week_hi", page.locator("main"));
+  await week.fill("0");
+  await expect(week).toHaveValue("1");
+  got["math:week-clamp-low"] = await snap("math_week_lo", page.locator("main"));
   check(got);
 });
