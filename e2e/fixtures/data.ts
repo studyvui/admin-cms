@@ -439,6 +439,153 @@ export const USER_STATS_FIXTURE = {
   newLast30Days: 1,
 };
 
+// Lưới golden mục 93 Đợt 4c (e2e/dot4c-dom-golden.spec.ts): đủ trạng thái cho bảng Người dùng.
+// VIP tính theo đồng hồ đóng băng 2026-11-04 trong spec.
+export const USER_STUDENT_VIP_ACTIVE = {
+  ...USER_STUDENT,
+  id: "u-student-vip-0003",
+  email: "student3@studyvui.vn",
+  name: "Học sinh Ba VIP",
+  vipUntil: "2026-12-31T00:00:00Z",
+};
+
+export const USER_STUDENT_VIP_EXPIRED = {
+  ...USER_STUDENT,
+  id: "u-student-vip-0004",
+  email: "student4@studyvui.vn",
+  name: "Học sinh Bốn hết hạn",
+  vipUntil: "2026-10-01T00:00:00Z",
+};
+
+export const USER_PARENT = {
+  ...USER_STUDENT,
+  id: "u-parent-0005",
+  email: "parent5@studyvui.vn",
+  name: "Phụ huynh Năm",
+  role: "parent",
+};
+
+export const USER_DELETED = {
+  ...USER_STUDENT,
+  id: "u-deleted-0006",
+  email: "deleted6@studyvui.vn",
+  name: "Người dùng đã xoá",
+  isActive: false,
+  deletedAt: "2026-03-01T00:00:00Z",
+};
+
+export const USERS_GOLDEN_FIXTURE = {
+  items: [
+    USER_ADMIN_SELF,
+    USER_STUDENT,
+    USER_TEACHER_INACTIVE,
+    USER_STUDENT_VIP_ACTIVE,
+    USER_STUDENT_VIP_EXPIRED,
+    USER_PARENT,
+    USER_DELETED,
+  ],
+  total: 7,
+  page: 1,
+  limit: 20,
+};
+
+export const USERS_ONLY_DELETED_FIXTURE = {
+  items: [USER_DELETED],
+  total: 1,
+  page: 1,
+  limit: 20,
+};
+
+export const USERS_PAGED_FIXTURE = {
+  items: Array.from({ length: 20 }, (_, i) => ({
+    ...USER_STUDENT,
+    id: `u-paged-${String(i + 1).padStart(4, "0")}`,
+    email: `paged${i + 1}@studyvui.vn`,
+    name: `Học sinh trang ${i + 1}`,
+  })),
+  total: 45,
+  page: 1,
+  limit: 20,
+};
+
+export const USERS_EMPTY_FIXTURE = { items: [], total: 0, page: 1, limit: 20 };
+
+// Bài học Toán các lớp / loại bài cho lưới golden trang AI Sinh đề Toán (mã G{lớp}_W{tuần}_MATH).
+function mathLesson(code: string, grade: number, week: number, lessonType: string, name: string) {
+  return {
+    ...MATH_LESSON,
+    id: `4444${grade}${String(week).padStart(2, "0")}-4444-4444-8444-444444444444`,
+    code,
+    week,
+    name,
+    lessonType,
+    skills: [lessonType],
+  };
+}
+export const MATH_LESSONS_GOLDEN = [
+  MATH_LESSON,
+  mathLesson("G1_W02_MATH", 1, 2, "sequence", "Dãy số"),
+  mathLesson("G1_W03_MATH", 1, 3, "comparison", "So sánh số"),
+  mathLesson("G2_W01_MATH", 2, 1, "calculation", "Cộng trừ trong 100"),
+  mathLesson("G3_W01_MATH", 3, 1, "area", "Diện tích"),
+  mathLesson("G4_W01_MATH", 4, 1, "division", "Phép chia"),
+  mathLesson("G5_W01_MATH", 5, 1, "decimal", "Số thập phân"),
+];
+
+// Bài học Tiếng Anh có từ vựng đủ nghĩa / ảnh / audio để trang AI Sinh đề sinh được cả 3 chế độ.
+const VOCAB_GOLDEN = ["cat", "dog", "bird", "fish", "frog", "duck"].map((w, i) => ({
+  word: w,
+  meaning: ["con mèo", "con chó", "con chim", "con cá", "con ếch", "con vịt"][i],
+  imageUrl: `https://cdn.studyvui.vn/grade1/english/${w}.png`,
+  audioUrl: `https://cdn.studyvui.vn/audio/grade1/english/${w}.mp3`,
+}));
+export const LESSON_ENG_RICH = { ...LESSON, vocabulary: VOCAB_GOLDEN };
+// Tuần 2: kỹ năng "phonics" (lọc danh sách Kỹ năng) và bài học có kỹ năng KHÔNG map được (tuần 3).
+export const LESSON_ENG_PHONICS = {
+  ...LESSON,
+  id: "22222222-2222-4222-8222-222222222223",
+  code: "G1_W02_1_ENG",
+  week: 2,
+  orderIndex: 2,
+  name: "Âm đầu",
+  skills: ["phonics"],
+  vocabulary: VOCAB_GOLDEN.slice(0, 4),
+};
+export const LESSON_ENG_UNMAPPED = {
+  ...LESSON,
+  id: "22222222-2222-4222-8222-222222222224",
+  code: "G1_W03_1_ENG",
+  week: 3,
+  orderIndex: 3,
+  name: "Kỹ năng lạ",
+  skills: ["xyz"],
+  vocabulary: VOCAB_GOLDEN.slice(0, 4),
+};
+export const LESSONS_ENG_GOLDEN = [LESSON_ENG_RICH, LESSON_ENG_PHONICS, LESSON_ENG_UNMAPPED];
+export const ASSETS_ENG_GOLDEN = VOCAB_GOLDEN.map((v) => ({
+  key: `grade1/english/${v.word}.png`,
+  url: `https://cdn.studyvui.vn/grade1/english/${v.word}.png`,
+  size: 1000,
+  lastModified: "2026-01-01T00:00:00Z",
+  type: "image" as const,
+}));
+
+export const MATH_USER_TEMPLATE = {
+  id: "tpl-user-0001",
+  lessonType: "calculation",
+  skill: "calculation",
+  grade: 1,
+  text: "Tính: {a} + {b} = ?",
+  formula: "a + b",
+  condition: "a + b <= 10",
+  vars: [
+    { name: "a", type: "number", min: 1, max: 5 },
+    { name: "b", type: "number", min: 1, max: 5 },
+  ],
+  distractorCount: 3,
+  source: "user",
+};
+
 // Báo cáo phân tích (GĐ3) — fixture cho e2e/analytics.spec.ts.
 
 export const ANALYTICS_OVERVIEW_FIXTURE = {

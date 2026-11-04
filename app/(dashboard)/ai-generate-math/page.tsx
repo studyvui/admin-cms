@@ -1,33 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Calculator,
-  Wand2,
-  Loader2,
-  Download,
-  Info,
-  Play,
-  Plus,
-  Pencil,
-  Trash2,
-  Settings2,
-  BookOpen,
-  AlertTriangle,
-} from "lucide-react";
+import { Calculator, Wand2, Loader2, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { extractError } from "@/lib/errors";
 import { getBuiltinsForLessonType } from "@/lib/math-gen/builtins";
 import { getGrade1ShapeBuiltinsForLessonType } from "@/lib/math-gen/builtins-grade1-shapes";
@@ -39,7 +17,6 @@ import { serverToTemplate } from "@/lib/math-gen/page-helpers";
 import { useMathGen } from "./use-math-gen";
 import { generateBatch } from "@/lib/math-gen/generate";
 import { toBulkRows, downloadBulkXlsx } from "@/lib/math-gen/export-xlsx";
-import { lessonTypeLabel, skillLabel } from "@/lib/math-gen/labels";
 import { TemplateEditorModal } from "@/components/math-template/template-editor-modal";
 import {
   SequenceRangeModal,
@@ -54,8 +31,9 @@ import type {
   ServerTemplate,
   TemplateInput,
 } from "@/lib/math-gen/types";
-
-const DIFF_COLOR: Record<number, string> = { 1: "#10b981", 2: "#f59e0b", 3: "#ef4444" };
+import { MathLessonPickerCard } from "./math-lesson-picker-card";
+import { MathTemplateBankCard } from "./math-template-bank-card";
+import { MathPreviewListCard } from "./math-preview-list-card";
 
 export default function AiGenerateMathPage() {
   const [grade, setGrade] = useState(1);
@@ -244,149 +222,29 @@ export default function AiGenerateMathPage() {
       </div>
 
       {/* Chọn bài học theo tuần */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BookOpen className="h-4 w-4" />
-            Bài học theo tuần
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3 sm:max-w-sm">
-            <div>
-              <Label className="text-xs">Lớp</Label>
-              <Select value={String(grade)} onValueChange={(v) => onGradeChange(Number(v))}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5].map((g) => (
-                    <SelectItem key={g} value={String(g)}>
-                      Lớp {g}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Tuần (1-35)</Label>
-              <Input
-                type="number"
-                min={1}
-                max={35}
-                value={week}
-                onChange={(e) => onWeekChange(Number(e.target.value))}
-                className="mt-1"
-              />
-            </div>
-          </div>
-          {currentLesson ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
-              <span className="font-mono text-xs text-muted-foreground">{currentLesson.code}</span>
-              <span className="font-semibold">{currentLesson.name}</span>
-              <Badge variant="secondary">{lessonTypeLabel(currentLesson.lessonType)}</Badge>
-              <span className="text-xs text-muted-foreground">Kỹ năng:</span>
-              {allowedSkills.map((s) => (
-                <Badge key={s} variant="outline" className="text-[10px]">{skillLabel(s)}</Badge>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              Tuần {week} chưa có bài học Toán (<span className="font-mono">G{grade}_W{String(week).padStart(2, "0")}_MATH</span>).
-              Tạo bài học ở trang <strong>Bài học</strong> trước.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <MathLessonPickerCard
+        grade={grade}
+        week={week}
+        currentLesson={currentLesson}
+        allowedSkills={allowedSkills}
+        onGradeChange={onGradeChange}
+        onWeekChange={onWeekChange}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* (A) Template manager */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
-              <span className="flex items-center gap-2">
-                <Settings2 className="h-4 w-4" />
-                Ngân hàng mẫu
-                {lessonType && <Badge variant="secondary">{lessonTypeLabel(lessonType)}</Badge>}
-              </span>
-              <Button size="sm" onClick={openAddTemplate} disabled={!lessonType}>
-                <Plus className="mr-1 h-4 w-4" /> Thêm mẫu
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!lessonType ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">
-                Chọn tuần có bài học Toán để xem/ thêm mẫu.
-              </p>
-            ) : (
-              <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-                {isLoading && <p className="text-xs text-muted-foreground">Đang tải mẫu…</p>}
-                {allTemplates.length === 0 && !isLoading && (
-                  <p className="py-6 text-center text-xs text-muted-foreground">
-                    Chưa có mẫu cho loại bài “{lessonTypeLabel(lessonType)}”. Bấm “Thêm mẫu”.
-                  </p>
-                )}
-                {allTemplates.map((t) => {
-                  const isSel = selectedTplId === t.id;
-                  return (
-                    <div
-                      key={t.id}
-                      className={cn(
-                        "cursor-pointer rounded-md border p-2 text-sm transition-colors",
-                        isSel ? "border-primary bg-primary/5" : "hover:bg-accent",
-                      )}
-                      onClick={() => setSelectedTplId(t.id)}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate font-medium">{t.text}</div>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                            {t.source === "builtin" ? (
-                              <Badge variant="outline" className="text-[10px] text-amber-600">⚙️ Built-in</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px] text-emerald-600">✏️ Custom</Badge>
-                            )}
-                            <Badge variant="secondary" className="text-[10px]">{skillLabel(t.skill)}</Badge>
-                            {t.formula !== "built-in" && (
-                              <code className="rounded bg-muted px-1 text-[10px]">{t.formula}</code>
-                            )}
-                            {t.condition && (
-                              <code className="rounded bg-amber-100 px-1 text-[10px] text-amber-700">{t.condition}</code>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
-                          {t.source === "user" ? (
-                            <>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" title="Sửa" onClick={() => openEditUser(t)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" title="Xoá" onClick={() => handleDelete(t.id)}>
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
-                            </>
-                          ) : t.formula !== "built-in" ? (
-                            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" title="Sửa (tạo bản sao)" onClick={() => openCloneBuiltin(t)}>
-                              <Pencil className="h-3.5 w-3.5" /> Sửa
-                            </Button>
-                          ) : (
-                            t.id === "TPL_SEQ_01" && (
-                              <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" title="Sửa range (start/step)" onClick={openSequenceRange}>
-                                <Pencil className="h-3.5 w-3.5" /> Sửa
-                              </Button>
-                            )
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <MathTemplateBankCard
+          lessonType={lessonType}
+          isLoading={isLoading}
+          allTemplates={allTemplates}
+          selectedTplId={selectedTplId}
+          setSelectedTplId={setSelectedTplId}
+          openAddTemplate={openAddTemplate}
+          openEditUser={openEditUser}
+          handleDelete={handleDelete}
+          openCloneBuiltin={openCloneBuiltin}
+          openSequenceRange={openSequenceRange}
+        />
 
         {/* (B) Generate config */}
         <Card>
@@ -446,56 +304,14 @@ export default function AiGenerateMathPage() {
       </div>
 
       {/* Preview list */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base">
-            <span>Xem trước ({selectedQ.size}/{questions.length} chọn)</span>
-            <Button size="sm" variant="outline" onClick={exportXlsx} disabled={exportableCount === 0}>
-              <Download className="mr-1 h-4 w-4" /> Xuất Excel 12 cột
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {questions.length === 0 ? (
-            <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-md border border-dashed text-center">
-              <Calculator className="h-10 w-10 text-muted-foreground/40" />
-              <p className="text-xs text-muted-foreground">Chọn mẫu → bấm Generate (0 token).</p>
-            </div>
-          ) : (
-            <div className="grid max-h-[460px] gap-2 overflow-y-auto pr-1 md:grid-cols-2">
-              {questions.map((q, i) => {
-                const exportable = q.optionsType !== "comparison";
-                return (
-                  <div key={q.id} className="flex items-start gap-2 rounded-md border p-2 text-sm">
-                    <input type="checkbox" checked={selectedQ.has(i)} onChange={() => toggleQ(i)} className="mt-1 h-4 w-4" />
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex flex-wrap items-center gap-1">
-                        <span className="rounded px-1.5 text-[10px] font-bold" style={{ color: DIFF_COLOR[q.difficulty] || "#64748b" }}>
-                          L{q.difficulty}
-                        </span>
-                        {q.assetRefs.length > 0 && (
-                          <Badge variant="outline" className="text-[10px] text-violet-500">🖼 {q.assetRefs.length}</Badge>
-                        )}
-                        {!exportable && (
-                          <Badge variant="outline" className="text-[10px] text-amber-600">không xuất 12 cột</Badge>
-                        )}
-                        <Button size="sm" variant="outline" className="ml-auto h-6 gap-1 px-2 text-[11px]" onClick={() => openPreview(i)}>
-                          <Play className="h-3 w-3" /> Xem trước
-                        </Button>
-                      </div>
-                      <div className="text-[13px]">
-                        <span className="font-medium text-muted-foreground">{i + 1}.</span> {q.text}
-                      </div>
-                      <div className="text-[12px] font-semibold text-emerald-600">✓ {q.correct_answer}</div>
-                      <div className="text-[11px] text-muted-foreground">Đáp án: {q.options.join(", ")}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <MathPreviewListCard
+        questions={questions}
+        selectedQ={selectedQ}
+        exportableCount={exportableCount}
+        exportXlsx={exportXlsx}
+        toggleQ={toggleQ}
+        openPreview={openPreview}
+      />
 
       <Card className="border-sky-200 bg-sky-50">
         <CardContent className="flex items-start gap-3 py-4 text-sm text-sky-900">
