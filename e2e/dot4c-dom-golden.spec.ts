@@ -188,7 +188,7 @@ test.beforeEach(async ({ context }) => {
 function usersMock(pagedTotal = false) {
   return new ApiMock()
     .onGet(/^\/admin\/users\/stats$/, USER_STATS_FIXTURE)
-    .onGet(/^\/admin\/users$/, (url) => {
+    .onGet(/^\/admin\/users$/, (url: URL) => {
       const pg = Number(url.searchParams.get("page") ?? 1);
       const role = url.searchParams.get("role");
       const status = url.searchParams.get("status");
@@ -413,7 +413,7 @@ async function openMath(page: Page) {
   await pngRoute(page);
   const api = new ApiMock()
     .onGet(/^\/admin\/lessons$/, MATH_LESSONS_GOLDEN)
-    .onGet(/^\/admin\/question-templates$/, (url) =>
+    .onGet(/^\/admin\/question-templates$/, (url: URL) =>
       url.searchParams.get("lessonType") === "calculation" && url.searchParams.get("grade") === "1"
         ? [MATH_USER_TEMPLATE]
         : [],
