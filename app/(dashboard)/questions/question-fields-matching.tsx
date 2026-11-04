@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 // ---- het tieu de tach file (muc 93 Dot 4b) ----
 
-export function MatchingFields({ form, watchedDistractors, normSide, pairConflicts, firstFreePair }: {
+export function renderMatchingFields({ form, watchedDistractors, normSide, pairConflicts, firstFreePair }: {
   form: UseFormReturn<QuestionFormValues>;
   watchedDistractors: { left: string; right: string }[] | undefined;
   normSide: (s: string) => string;

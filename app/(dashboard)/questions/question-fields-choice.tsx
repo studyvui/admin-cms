@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 // ---- het tieu de tach file (muc 93 Dot 4b) ----
 
-export function McFields({ form, selectedArchetype }: {
+export function renderMcFields({ form, selectedArchetype }: {
   form: UseFormReturn<QuestionFormValues>;
   selectedArchetype: MathArchetype | undefined;
 }) {
@@ -90,7 +90,7 @@ export function McFields({ form, selectedArchetype }: {
   );
 }
 
-export function ImageChoiceFields({ form }: {
+export function renderImageChoiceFields({ form }: {
   form: UseFormReturn<QuestionFormValues>;
 }) {
   const { register, setValue, watch, formState: { errors } } = form;
@@ -183,7 +183,7 @@ export function ImageChoiceFields({ form }: {
   );
 }
 
-export function AudioChoiceFields({ form }: {
+export function renderAudioChoiceFields({ form }: {
   form: UseFormReturn<QuestionFormValues>;
 }) {
   const { register, setValue, watch, formState: { errors } } = form;

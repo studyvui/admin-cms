@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 // ---- het tieu de tach file (muc 93 Dot 4b) ----
 
-export function LetterFields({ form }: {
+export function renderLetterFields({ form }: {
   form: UseFormReturn<QuestionFormValues>;
 }) {
   const { register, watch, formState: { errors } } = form;
@@ -56,7 +56,7 @@ export function LetterFields({ form }: {
   );
 }
 
-export function ReorderFields({ form }: {
+export function renderReorderFields({ form }: {
   form: UseFormReturn<QuestionFormValues>;
 }) {
   const { register, setValue, watch, formState: { errors } } = form;
@@ -108,7 +108,7 @@ export function ReorderFields({ form }: {
   );
 }
 
-export function WordBlankFields({ form }: {
+export function renderWordBlankFields({ form }: {
   form: UseFormReturn<QuestionFormValues>;
 }) {
   const { register, setValue, watch, formState: { errors } } = form;
@@ -186,7 +186,7 @@ export function WordBlankFields({ form }: {
   );
 }
 
-export function JsonFields({ form }: {
+export function renderJsonFields({ form }: {
   form: UseFormReturn<QuestionFormValues>;
 }) {
   const { register, formState: { errors } } = form;

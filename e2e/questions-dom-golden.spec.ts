@@ -424,3 +424,40 @@ test("Lưu câu sửa: payload PATCH đúng cho mỗi kiểu", async ({ page }) 
   }
   check(got);
 });
+
+// Đổi "Chế độ nhập" SAU KHI đã gõ: bản gốc (origin/main) render các khối chế độ ngay tại chỗ nên React dùng lại ô nhập
+// cùng vị trí / kiểu và react-hook-form đọc chữ cũ từ DOM sang field mới. Khoá hành vi này (review Đợt 4b, C1).
+// Giá trị mong đợi lấy từ chạy thật trên origin/main.
+test("Đổi chế độ nhập sau khi đã gõ: chữ mang sang ô của chế độ mới như bản gốc", async ({ page }) => {
+  const api = await setup(page);
+  const dialog = await openAdd(page);
+  await pickMode(page, dialog, MODE_LABEL.letter);
+  await dialog.locator("#markedWord").fill("It is");
+  await pickMode(page, dialog, MODE_LABEL.reorder);
+  await expect(dialog.locator("#sentence")).toHaveValue("It is");
+  await dialog.getByRole("button", { name: "Tạo mới" }).click();
+  await expect.poll(() => api.find("POST", /^\/admin\/questions$/)?.body).toBeTruthy();
+  const body = api.find("POST", /^\/admin\/questions$/)!.body as {
+    type: string;
+    correctAnswer: string;
+    content: { correct_order: string[] };
+  };
+  expect(body.type).toBe("reorder");
+  expect(body.correctAnswer).toBe("It is");
+  expect(body.content.correct_order).toEqual(["It", "is"]);
+
+  // reorder → word_blank
+  const dialog2 = await openAdd(page);
+  await pickMode(page, dialog2, MODE_LABEL.reorder);
+  await dialog2.locator("#sentence").fill("It is a [pen]");
+  await pickMode(page, dialog2, MODE_LABEL.word_blank);
+  await expect(dialog2.locator("#markedSentence")).toHaveValue("It is a [pen]");
+});
+
+test("Đổi chế độ nhập sau khi đã gõ: mc → json ở bài không phải Tiếng Anh", async ({ page }) => {
+  await setup(page, [LESSON_PLAIN]);
+  const dialog = await openAdd(page);
+  await dialog.locator("#prompt").fill("abc");
+  await pickMode(page, dialog, MODE_LABEL.json);
+  await expect(dialog.locator("#contentJson")).toHaveValue("abc");
+});

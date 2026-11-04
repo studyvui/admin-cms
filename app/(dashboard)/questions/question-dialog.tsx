@@ -40,9 +40,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { QuestionTopFields } from "./question-dialog-top-fields";
-import { McFields, ImageChoiceFields, AudioChoiceFields } from "./question-fields-choice";
-import { LetterFields, ReorderFields, WordBlankFields, JsonFields } from "./question-fields-text";
-import { MatchingFields } from "./question-fields-matching";
+import { renderMcFields, renderImageChoiceFields, renderAudioChoiceFields } from "./question-fields-choice";
+import { renderLetterFields, renderReorderFields, renderWordBlankFields, renderJsonFields } from "./question-fields-text";
+import { renderMatchingFields } from "./question-fields-matching";
 
 export function QuestionDialog({
   open,
@@ -275,21 +275,21 @@ export function QuestionDialog({
           </div>
 
           {mode === "mc" ? (
-            <McFields form={form} selectedArchetype={selectedArchetype} />
+            renderMcFields({ form, selectedArchetype })
           ) : mode === "image_choice" ? (
-            <ImageChoiceFields form={form} />
+            renderImageChoiceFields({ form })
           ) : mode === "audio_choice" ? (
-            <AudioChoiceFields form={form} />
+            renderAudioChoiceFields({ form })
           ) : mode === "letter" ? (
-            <LetterFields form={form} />
+            renderLetterFields({ form })
           ) : mode === "reorder" ? (
-            <ReorderFields form={form} />
+            renderReorderFields({ form })
           ) : mode === "matching" ? (
-            <MatchingFields form={form} watchedDistractors={watchedDistractors} normSide={normSide} pairConflicts={pairConflicts} firstFreePair={firstFreePair} />
+            renderMatchingFields({ form, watchedDistractors, normSide, pairConflicts, firstFreePair })
           ) : mode === "word_blank" ? (
-            <WordBlankFields form={form} />
+            renderWordBlankFields({ form })
           ) : (
-            <JsonFields form={form} />
+            renderJsonFields({ form })
           )}
 
           <AssetRefsField
