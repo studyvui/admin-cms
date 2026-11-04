@@ -247,7 +247,7 @@ test("users: lọc vai trò, trạng thái đã xoá, tìm kiếm rỗng", async
   check(got);
 });
 
-test("users: trạng thái tải và lỗi", async ({ page }) => {
+test("users: trạng thái tải", async ({ page }) => {
   const got: Record<string, string> = {};
   // Tải: GET danh sách không bao giờ trả lời.
   await new ApiMock().onGet(/^\/admin\/users\/stats$/, USER_STATS_FIXTURE).install(page);
@@ -255,6 +255,8 @@ test("users: trạng thái tải và lỗi", async ({ page }) => {
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Người dùng" })).toBeVisible();
   await expect(page.locator(".animate-pulse").first()).toBeVisible();
+  // 4 thẻ thống kê đã có số (stats trả ngay); chỉ còn skeleton của bảng danh sách.
+  await expect(page.locator("div.text-3xl.font-bold")).toHaveCount(4);
   got["users:loading"] = await snap("users_loading", page.locator("main"));
   check(got);
 });
@@ -307,7 +309,7 @@ test("users: các hộp thoại Thêm / Sửa / Đặt lại mật khẩu / Rese
   check(got);
 });
 
-test("users: thao tác hàng — khoá (confirm + PATCH), xoá (confirm + DELETE), khôi phục, banner lỗi không rò", async ({ page }) => {
+test("users: thao tác hàng — mở khoá / khoá (PATCH), xoá (DELETE), khôi phục (restore)", async ({ page }) => {
   const api = await openUsers(page);
   const got: Record<string, string> = {};
   const teacher = page.getByRole("row", { name: /teacher2@studyvui\.vn/ });
@@ -408,6 +410,11 @@ test("ai-generate: sinh 3 chế độ, bỏ chọn, Xem thử, Tạo câu hỏi,
 
 /* ========================== ai-generate-math ========================== */
 
+// Query mẫu của trang Toán chạy lại mỗi khi đổi lớp / tuần: chờ hết dòng "Đang tải mẫu…" rồi mới chụp.
+async function templatesSettled(page: Page) {
+  await expect(page.getByText("Đang tải mẫu…")).toHaveCount(0);
+}
+
 async function openMath(page: Page) {
   await seedRandom(page);
   await pngRoute(page);
@@ -422,6 +429,7 @@ async function openMath(page: Page) {
   await page.goto("/ai-generate-math");
   await expect(page.getByRole("heading", { name: "AI Sinh đề Toán" })).toBeVisible();
   await expect(page.getByText("⚙️ Built-in").first()).toBeVisible();
+  await templatesSettled(page);
   return api;
 }
 
@@ -433,6 +441,7 @@ test("ai-generate-math: tuần 1 lớp 1 (built-in + mẫu tự tạo), lớp 2.
   for (const g of [2, 3, 4, 5]) {
     await pickCombo(page, 0, `Lớp ${g}`);
     await expect(page.getByText(`G${g}_W01_MATH`, { exact: true })).toBeVisible();
+    await templatesSettled(page);
     got[`math:g${g}-w1`] = await snap(`math_g${g}w1`, page.locator("main"));
   }
   await pickCombo(page, 0, "Lớp 1");
@@ -499,6 +508,7 @@ test("ai-generate-math: mẫu tự tạo (Sửa / Xoá), Thêm mẫu, bản sao 
   // Tuần 2 lớp 1 = "sequence" → mẫu TPL_SEQ_01 có nút Sửa range.
   await page.locator('input[type="number"]').first().fill("2");
   await expect(page.getByText("G1_W02_MATH", { exact: true })).toBeVisible();
+  await templatesSettled(page);
   got["math:g1-w2-sequence"] = await snap("math_g1w2", page.locator("main"));
   await page.getByTitle("Sửa range (start/step)").click();
   await expect(dialog).toBeVisible();
@@ -516,12 +526,15 @@ test("ai-generate-math: đổi tuần kẹp trong 1..35 và bỏ chọn mẫu đ
   await expect(page.getByText("G1_W02_MATH", { exact: true })).toBeVisible();
   await week.fill("1");
   await expect(page.getByText("G1_W01_MATH", { exact: true })).toBeVisible();
+  await templatesSettled(page);
   got["math:week-change-resets-selection"] = await snap("math_week_reset", page.locator("main"));
   await week.fill("99");
   await expect(week).toHaveValue("35");
+  await templatesSettled(page);
   got["math:week-clamp-high"] = await snap("math_week_hi", page.locator("main"));
   await week.fill("0");
   await expect(week).toHaveValue("1");
+  await templatesSettled(page);
   got["math:week-clamp-low"] = await snap("math_week_lo", page.locator("main"));
   check(got);
 });

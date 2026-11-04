@@ -39,7 +39,6 @@ import {
   type InputMode,
 } from "./ai-generate-constants";
 
-
 export default function AiGeneratePage() {
   /* ---- Courses & Lessons from API ---- */
   const [courses, setCourses] = useState<Course[]>([]);
