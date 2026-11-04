@@ -156,6 +156,176 @@ export const Q_DEPRECATED = q({
 
 export const QUESTIONS = [Q_MC, Q_IMAGE, Q_AUDIO, Q_LETTER, Q_DEPRECATED];
 
+// ---- Fixture bổ sung cho e2e/questions-dom-golden.spec.ts (mục 93 Đợt 4b): phủ MỌI kiểu mà
+// hộp thoại Thêm/Sửa câu hỏi và modal Xem thử rẽ nhánh. KHÔNG đổi hằng có sẵn ở trên. ----
+
+// Bài không phải Tiếng Anh (mode json) và bài Toán Lớp 1 có catalog "Dạng bài" (cùng khoá học để
+// dialog liệt kê được; mã "G1_W01_MATH" khớp MATH_ARCHETYPES_G1).
+export const LESSON_PLAIN = {
+  ...LESSON,
+  id: "66666666-6666-4666-8666-666666666666",
+  code: "G1_W02_1_VOCAB",
+  name: "Từ vựng chung",
+  skills: ["vocab", "grammar"],
+};
+export const LESSON_MATH_G1 = {
+  ...LESSON,
+  id: "77777777-7777-4777-8777-777777777777",
+  code: "G1_W01_MATH",
+  name: "Phép cộng trong 10",
+  lessonType: "calculation",
+  skills: ["calculation"],
+};
+
+export const Q_G_IMAGE_PER = q({
+  id: "q-gimp-0010",
+  code: "G1_W01_1_ENG_010",
+  type: "image_choice",
+  content: { prompt: "Chọn ảnh đúng", image: "apple.png", options: ["apple", "banana", "cherry", "grape"] },
+  correctAnswer: "banana",
+  assetRefs: ["apple.png", "banana.png", "cherry.png", "grape.png"],
+});
+export const Q_G_AUDIO_PLAIN = q({
+  id: "q-gaud-0011",
+  code: "G1_W01_1_ENG_011",
+  type: "audio_choice",
+  skill: "listening",
+  content: { prompt: "", audio: "word.mp3", options: ["cat", "dog", "fish", "bird"], optionImages: ["cat.png"] },
+  correctAnswer: "cat",
+  assetRefs: ["word.mp3", "cat.png"],
+});
+export const Q_G_LETTER = q({
+  id: "q-glet-0012",
+  code: "G1_W01_1_ENG_012",
+  type: "missing_letter",
+  content: {
+    prompt: "",
+    word: "hello",
+    pattern: "h__lo",
+    prefix: "h",
+    suffix: "lo",
+    blanks: 2,
+    tiles: ["e", "l", "x", "y"],
+  },
+  correctAnswer: "el",
+  assetRefs: ["hello.mp3"],
+});
+export const Q_G_REORDER = q({
+  id: "q-gre-0013",
+  code: "G1_W01_1_ENG_013",
+  type: "reorder",
+  content: {
+    prompt: "Sắp xếp thành câu",
+    items: ["pen", "a", "is", "It"],
+    correct_order: ["It", "is", "a", "pen"],
+  },
+  correctAnswer: "It is a pen",
+  assetRefs: ["g1_sent_pen.mp3"],
+});
+export const Q_G_MATCHING = q({
+  id: "q-gmat-0014",
+  code: "G1_W01_1_ENG_014",
+  type: "matching",
+  content: {
+    prompt: "Nối câu hỏi với câu trả lời",
+    image: "g1_sent_name_nam.webp",
+    pair: { left: "What is your name?", right: "I am Nam" },
+    distractors: [
+      { left: "What is this?", right: "It is a pen" },
+      { left: "How old are you?", right: "I am six" },
+    ],
+    pairs: [
+      ["What is your name?", "I am Nam"],
+      ["What is this?", "It is a pen"],
+      ["How old are you?", "I am six"],
+    ],
+  },
+  correctAnswer: "What is your name?|I am Nam",
+  assetRefs: ["g1_sent_name_nam.webp"],
+});
+export const Q_G_MATCHING_LEGACY = q({
+  id: "q-gmatl-0015",
+  code: "G1_W01_1_ENG_015",
+  type: "matching",
+  content: { prompt: "Cũ", pairs: [] },
+  correctAnswer: "",
+});
+export const Q_G_FILL_BLANK = q({
+  id: "q-gfb-0016",
+  code: "G1_W01_1_ENG_016",
+  type: "fill_blank",
+  content: {
+    prompt: "Chọn từ đúng",
+    prefix: "It is a",
+    suffix: "",
+    answer: "pen",
+    distractors: ["book", "bag"],
+    options: ["pen", "book", "bag"],
+  },
+  correctAnswer: "pen",
+});
+export const Q_G_COUNT = q({
+  id: "q-gcnt-0017",
+  code: "G1_W01_1_ENG_017",
+  type: "count_objects",
+  skill: "counting",
+  content: { prompt: "Có bao nhiêu quả táo?", options: ["2", "3", "4", "5"] },
+  correctAnswer: "3",
+  assetRefs: ["apples3.png"],
+});
+export const Q_G_NUMREC = q({
+  id: "q-gnum-0018",
+  code: "G1_W01_1_ENG_018",
+  type: "number_recognition",
+  skill: "counting",
+  content: { prompt: "Số này là số mấy?" },
+  correctAnswer: "7",
+  assetRefs: ["seven.png"],
+});
+export const Q_G_COMPARE = q({
+  id: "q-gcmp-0019",
+  code: "G1_W01_1_ENG_019",
+  type: "compare_numbers",
+  skill: "comparison",
+  content: { prompt: "So sánh", numbers: [3, 5] },
+  correctAnswer: "<",
+});
+export const Q_G_JSON = q({
+  id: "q-gjson-0020",
+  code: "G1_W01_1_ENG_020",
+  type: "unknown_type",
+  content: { prompt: "Kiểu lạ", foo: 1, nested: { a: [1, 2] } },
+  correctAnswer: "x",
+});
+export const Q_G_JSON_OPTS = q({
+  id: "q-gjsono-0021",
+  code: "G1_W01_1_ENG_021",
+  type: "unknown_type",
+  content: { prompt: "Lạ có lựa chọn", options: ["u", "v"] },
+  correctAnswer: "u",
+  assetRefs: ["x.png", "y.mp3"],
+});
+
+/** Bộ câu hỏi đầy đủ mọi kiểu cho golden (cùng lesson ENG). */
+export const QUESTIONS_GOLDEN = [
+  Q_MC,
+  Q_IMAGE,
+  Q_AUDIO,
+  Q_LETTER,
+  Q_G_IMAGE_PER,
+  Q_G_AUDIO_PLAIN,
+  Q_G_LETTER,
+  Q_G_REORDER,
+  Q_G_MATCHING,
+  Q_G_MATCHING_LEGACY,
+  Q_G_FILL_BLANK,
+  Q_G_COUNT,
+  Q_G_NUMREC,
+  Q_G_COMPARE,
+  Q_G_JSON,
+  Q_G_JSON_OPTS,
+];
+
 // Cấu hình hệ thống + hồ sơ cá nhân cho trang Cài đặt (Settings, GĐ1).
 export const SETTINGS_FIXTURE = [
   {
