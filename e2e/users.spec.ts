@@ -253,6 +253,62 @@ test("tự bảo vệ: dòng của chính admin đang đăng nhập ẩn nút Kh
   await expect(otherRow.getByTitle("Xoá người dùng")).toBeVisible();
 });
 
+// Giữ yêu cầu ghi (PATCH / DELETE) ở trạng thái đang chạy để quan sát nút bị khoá trong lúc mutation
+// còn pending. route.fallback() chuyển các request khác về ApiMock đã cài trước.
+async function holdWrite(
+  page: import("@playwright/test").Page,
+  method: "PATCH" | "DELETE",
+  pathPattern: RegExp,
+) {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  await page.route(pathPattern, async (route) => {
+    if (route.request().method() !== method) return route.fallback();
+    await gate;
+    return route.fulfill({ json: { success: true } });
+  });
+  return release;
+}
+
+test("trong lúc Khoá đang chạy, nút Khoá của mọi dòng bị disabled (updateMut.isPending), xong thì bật lại", async ({
+  page,
+}) => {
+  const api = setup();
+  await api.install(page);
+  await page.goto("/users");
+  page.on("dialog", (d) => d.accept());
+
+  const release = await holdWrite(page, "PATCH", /\/api\/v1\/admin\/users\/u-student-0001$/);
+  const row = page.getByRole("row", { name: new RegExp(USER_STUDENT.email) });
+  const otherRow = page.getByRole("row", { name: new RegExp(USER_TEACHER_INACTIVE.email) });
+  await row.getByTitle("Khoá tài khoản").click();
+
+  await expect(row.getByTitle("Khoá tài khoản")).toBeDisabled();
+  // updateMut dùng chung cho mọi dòng → nút Mở khoá của dòng khác cũng bị khoá.
+  await expect(otherRow.getByTitle("Mở khoá tài khoản")).toBeDisabled();
+
+  release();
+  await expect(otherRow.getByTitle("Mở khoá tài khoản")).toBeEnabled();
+});
+
+test("trong lúc Xoá đang chạy, nút Xoá bị disabled (deleteMut.isPending), xong thì bật lại", async ({
+  page,
+}) => {
+  const api = setup();
+  await api.install(page);
+  await page.goto("/users");
+  page.on("dialog", (d) => d.accept());
+
+  const release = await holdWrite(page, "DELETE", /\/api\/v1\/admin\/users\/u-student-0001$/);
+  const row = page.getByRole("row", { name: new RegExp(USER_STUDENT.email) });
+  await row.getByTitle("Xoá người dùng").click();
+
+  await expect(row.getByTitle("Xoá người dùng")).toBeDisabled();
+
+  release();
+  await expect(row.getByTitle("Xoá người dùng")).toBeEnabled();
+});
+
 test("editor không có quyền truy cập", async ({ context, page }) => {
   const api = setup();
   await api.install(page);

@@ -35,13 +35,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 type UsersHook = ReturnType<typeof useUsers>;
 
-// Mục 93 Đợt 4c: Card Danh sách tách nguyên văn từ page.tsx. Mutation truyền nguyên đối tượng
-// của page.tsx (không sao chép) để các `disabled={…Mut.isPending}` vẫn đọc đúng nguồn.
 function formatDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("vi-VN");
 }
 
+// Mục 93 Đợt 4c: Card Danh sách tách nguyên văn từ page.tsx. Mutation truyền nguyên đối tượng
+// của page.tsx (không sao chép) để các `disabled={…Mut.isPending}` vẫn đọc đúng nguồn.
 export function UsersListCard({
   items,
   total,
